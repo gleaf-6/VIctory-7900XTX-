@@ -34,7 +34,9 @@ or publisher.
 - page mappings as runs of pages, and the `codec-d/cool_fox` fork's six commits
   (deferred descriptor records, bindless refreshes scoped to their heap,
   textures sent ahead, residency and pool back-off);
-- `scripts\play-rx7600.ps1`: the profile these numbers were measured with.
+- `scripts\play-rx7600.ps1`: the profile these numbers were measured with
+  (Series S, the host FidelityFX upscaler and frame generation turned on by
+  default when the SDK folder is given).
 
 What was gained, and what was measured and rejected, is not part of this
 repository: the working notes were kept by the maintainers while the fork was
@@ -97,8 +99,22 @@ git clone <this repository>
 cd VIctory-7900XTX
 copy victory.example.toml victory.toml      # then set your paths, outside this folder
 cargo build --locked --profile diag -p victory --features diagnostics
+$env:VICTORY_FIDELITYFX_SDK = '<SDK>\Kits\FidelityFX\signedbin'
 scripts\play-rx7600.ps1 -Exe <path of your copy's executable>
 ```
+
+The last line is the measured profile and needs the FidelityFX folder: with it,
+the script runs **Series S**, answers the console's 720p upscale with the host
+**FidelityFX (FSR)** and puts a **generated frame** between the rendered ones,
+on top of the tuning it already sets (buffers kept in the card's memory,
+`VICTORY_RELAY=2`, in-place copies off, `VICTORY_AMBIENT=0.4`).
+
+**Without that folder there is no profile to speak of**: Series S draws a black
+world, so the script falls back to Series X and says so in the window; FSR and
+frame generation stay off. Pass the folder directly with
+`-FidelityFxDir <signedbin>` if you prefer not to set the variable.
+`-FrameGen:$false` keeps FSR without the generated frame; `-SeriesX` forces the
+bigger console.
 
 `-RayTracing` turns the title's ray-traced indirect light on (it is much
 heavier here); `docs/guide.en.md` explains every switch, the upscaler and

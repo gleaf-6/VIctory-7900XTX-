@@ -48,19 +48,23 @@ num port nativo do jogo seria outro mundo.
 
 ```powershell
 cargo build --locked --profile diag -p victory --features diagnostics
+$env:VICTORY_FIDELITYFX_SDK = '<SDK>\Kits\FidelityFX\signedbin'
 scripts\play-rx7600.ps1 -Exe <sua cópia>\game_scarlett_master.exe
 ```
 
 `scripts\play-rx7600.ps1` é o perfil com que todos os números acima foram
-medidos. Ele recebe o executável do jogo (`-Exe`) e, opcionalmente, a pasta do
-FidelityFX (`-FidelityFxDir`, ou a variável de ambiente
-`VICTORY_FIDELITYFX_SDK`).
+medidos. Ele recebe o executável do jogo (`-Exe`) e a pasta do FidelityFX
+(`-FidelityFxDir`, ou a variável de ambiente `VICTORY_FIDELITYFX_SDK`). Com essa
+pasta a execução é **Series S**, o upscale do 720p do console é respondido pelo
+FSR no host e um quadro gerado entra entre os renderizados; sem ela o script
+avisa, cai para **Series X** (o Series S desenharia um mundo preto) e deixa FSR
+e frame generation desligados.
 
 ## O que o perfil liga
 
 | o quê | como |
 |---|---|
-| perfil de console Series S | passado ao runner (`--console series-s`) |
+| perfil de console Series S | padrão quando a pasta do SDK é informada (`--console series-s`); `-SeriesX` para o console maior |
 | o upscaler FidelityFX de PC | `VICTORY_FIDELITYFX_DIR` (o `signedbin` do SDK) |
 | **frame generation** | `VICTORY_FRAMEGEN=1`, ligado por padrão quando a pasta do SDK é dada |
 | os dois planes de apresentação compostos | automático (o Series S apresenta dois) |
@@ -104,7 +108,7 @@ imagem aparece a cerca de **duas vezes** a taxa renderizada (≈6–8 renderizad
 |---|---|
 | `-Exe <caminho>` | o executável do jogo (obrigatório) |
 | `-Resolution 1280x720` | o modo de exibição informado ao título (padrão 720p) |
-| `-SeriesS` | inicia no perfil Series S (o perfil desta árvore) |
+| `-SeriesS` / `-SeriesX` | força o console menor / maior (Series S é o padrão com a pasta do SDK) |
 | `-FidelityFxDir <pasta>` | o `signedbin` do SDK: upscaler de host e frame generation |
 | `-FrameGen` / `-FrameGen:$false` | frame generation ligado / desligado |
 | `-Async` | submissões preparadas por uma thread nossa: mesmo quadro, menos artefatos de streaming |

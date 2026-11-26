@@ -10,27 +10,31 @@
 #     less of the PC's memory with it;
 #   - the diagnostics build's per-second statistics are left out (the memory
 #     map alone takes about a second each time it is written).
-#   - the title runs as the bigger console (Series X). The smaller one is
-#     3-4x faster on this hardware (173-370 ms a frame against 337-1,441, and
-#     19 GB of the PC's memory against 22-26) but on this fork it does not
-#     draw its 2D layer: the loading screen and the opening cutscene are black
-#     and the world comes without HUD, subtitles or menu. The shorter frames
-#     were frames without the interface. -SeriesS is there for whoever wants
-#     to look into that path.
+#   - the title runs as the smaller console (Series S) when the FidelityFX
+#     folder is given: that is the profile every number here was measured
+#     with. Its two presentation planes are composed into one 1080p picture
+#     (loading screens, cutscene video, HUD, subtitles and menu included),
+#     the console's 720p upscale is answered by the PC FidelityFX SDK, and a
+#     generated frame goes between the rendered ones. WITHOUT that folder
+#     Series S has no upscaler to answer it: the world comes black, so the
+#     run falls back to the bigger console (Series X), which renders alone.
+#     -SeriesS and -SeriesX force either one.
 #   scripts\play-rx7600.ps1 -Exe <path of your own copy's executable>
+#       -FidelityFxDir <SDK>\Kits\FidelityFX\signedbin
 # -Resolution   1280x720 (the default), 1600x900 or 1920x1080
 # -RayTracing   the title's own ray-traced indirect light: lit interiors,
 #               about a third slower
 # -Stats        keep the diagnostics build's statistics (VICTORY_LOG=info)
-# -SeriesS      run the title as the smaller console: 3-4x shorter frames, but
-#               on this fork its 2D layer (loading screens, cutscene video,
-#               HUD, subtitles, menu) is black — see above
-# -Tune         experimental, for a card of 8 GB: title buffers kept in the
-#               card's memory (VICTORY_CARD_BUFFERS_MIN_KB=64,
-#               VICTORY_CARD_BUFFERS_MB=1024, after fxceless/victory-fork).
-#               VICTORY_INPLACE is NOT part of it: measured here, that one
+# -SeriesS      force the smaller console (the default when -FidelityFxDir or
+#               VICTORY_FIDELITYFX_SDK is given)
+# -SeriesX      force the bigger console (the default without the SDK: it
+#               renders without the host upscaler)
+# -Tune         kept for old command lines: the card-side buffers it sets
+#               (VICTORY_CARD_BUFFERS_MIN_KB=64, VICTORY_CARD_BUFFERS_MB=1024,
+#               after fxceless/victory-fork) are the default now.
+#               VICTORY_INPLACE is NOT part of them: measured here, that one
 #               made frames 1.2-2.0 s (from 0.3-1.4) and ended the process
-#               after about 100 s — the title frees memory it has opened.
+#               after about 100 s - the title frees memory it has opened.
 # -Record       write down the pipelines this run makes (VICTORY_PIPELINE_BOOK=1),
 #               so that `target\diag\victory.exe warm --used` can make them all
 #               ahead of the next run and no frame waits for one
@@ -43,6 +47,7 @@ param(
     [ValidateSet('1280x720', '1600x900', '1920x1080', '2560x1440', '3840x2160')][string]$Resolution = '1280x720',
     [switch]$RayTracing,
     [switch]$SeriesS,
+    [switch]$SeriesX,
     [switch]$Record,
     [switch]$Tune,
     [string]$PipelineDump = '',
@@ -217,6 +222,30 @@ $paths = 'VICTORY_CONFIG', 'VICTORY_GAME_DIR', 'VICTORY_CACHE_DIR', 'VICTORY_DAT
 Get-ChildItem Env:VICTORY_* | Where-Object { $_.Name -notin $paths } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
 foreach ($k in $settings.Keys) { Set-Item "Env:$k" $settings[$k] }
 $Exe = (Resolve-Path $Exe).Path
-$console = if ($SeriesS) { @('--console', 'series-s') } else { @() }
+# Series S is the measured profile, but it needs the host upscaler: without the
+# FidelityFX folder its world comes black, so the default falls back to Series
+# X there. An explicit switch always wins.
+$seriesS = if ($PSBoundParameters.ContainsKey('SeriesS') -or $PSBoundParameters.ContainsKey('SeriesX')) {
+    ([bool]$SeriesS) -and (-not [bool]$SeriesX)
+} else {
+    [bool]$FidelityFxDir
+}
+$console = if ($seriesS) { @('--console', 'series-s') } else { @() }
+# Say which profile this run is, and what it is missing: the measured profile
+# depends on the FidelityFX folder for the upscale and for the generated frame.
+$fgOn = ($settings.VICTORY_FRAMEGEN -eq '1')
+Write-Host ("profile: {0} | FSR: {1} | frame generation: {2} | card buffers: {3} | relay {4}, inplace {5}, ambient {6}" -f `
+    $(if ($seriesS) { 'Series S' } else { 'Series X' }), `
+    $(if ($FidelityFxDir) { 'on' } else { 'OFF' }), `
+    $(if ($fgOn) { 'on' } else { 'off' }), `
+    $(if ($CardBuffers -eq 0) { 'off' } else { '1 GiB' }), `
+    $Relay, $Inplace, $settings.VICTORY_AMBIENT)
+if (-not $FidelityFxDir) {
+    Write-Host 'warning: no FidelityFX folder. Series S has no upscaler to answer it and draws a black world,' -ForegroundColor Yellow
+    Write-Host '         so this run falls back to Series X and is NOT the profile the numbers were measured with.' -ForegroundColor Yellow
+    Write-Host '         For the measured profile (Series S + FSR + frame generation):' -ForegroundColor Yellow
+    Write-Host '           $env:VICTORY_FIDELITYFX_SDK = ''<SDK>\Kits\FidelityFX\signedbin''' -ForegroundColor Yellow
+    Write-Host '           scripts\play-rx7600.ps1 -Exe <path of your copy''s executable>' -ForegroundColor Yellow
+}
 Push-Location (Join-Path $PSScriptRoot '..')   # victory.toml is looked for here
 try { & $victory run $Exe --execute @console } finally { Pop-Location }

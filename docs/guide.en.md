@@ -47,18 +47,23 @@ up; on a native PC build of the game it would be a different world.
 
 ```powershell
 cargo build --locked --profile diag -p victory --features diagnostics
+$env:VICTORY_FIDELITYFX_SDK = '<SDK>\Kits\FidelityFX\signedbin'
 scripts\play-rx7600.ps1 -Exe <your copy>\game_scarlett_master.exe
 ```
 
 `scripts\play-rx7600.ps1` is the profile every number above was measured with.
-It takes the game's executable (`-Exe`) and, optionally, the FidelityFX folder
+It takes the game's executable (`-Exe`) and the FidelityFX folder
 (`-FidelityFxDir`, or the environment variable `VICTORY_FIDELITYFX_SDK`).
+With that folder the run is **Series S**, the console's 720p upscale is answered
+by the host FSR and a generated frame goes between rendered ones; without it the
+script warns, falls back to **Series X** (Series S would draw a black world) and
+leaves FSR and frame generation off.
 
 ## What the profile turns on
 
 | what | how |
 |---|---|
-| Series S console profile | passed to the runner (`--console series-s`) |
+| Series S console profile | default when the SDK folder is given (`--console series-s`); `-SeriesX` for the bigger console |
 | the PC FidelityFX upscaler | `VICTORY_FIDELITYFX_DIR` (the SDK's `signedbin`) |
 | **frame generation** | `VICTORY_FRAMEGEN=1`, on by default when the SDK folder is given |
 | the two presentation planes composed | automatic (Series S presents two) |
@@ -101,7 +106,7 @@ shown at about **twice** the rendered rate (≈6–8 rendered, ≈15 shown).
 |---|---|
 | `-Exe <path>` | the game's executable (required) |
 | `-Resolution 1280x720` | the display mode the title is told about (default 720p) |
-| `-SeriesS` | start in the Series S profile (the one this tree is tuned for) |
+| `-SeriesS` / `-SeriesX` | force the smaller / bigger console (Series S is the default with the SDK folder) |
 | `-FidelityFxDir <dir>` | the SDK's `signedbin`: the host upscaler and frame generation |
 | `-FrameGen` / `-FrameGen:$false` | frame generation on / off |
 | `-Async` | submissions prepared by a thread of ours: the same frame, fewer streaming artefacts |
