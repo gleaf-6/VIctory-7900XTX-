@@ -157,7 +157,9 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
   settle here (the same rays feed it); it has been there since the first builds
   and is not the picture fixes.
 - Frame generation ghosts on fast motion at this frame rate.
-- A few console pipeline variants are not made (the title goes without them).
+- The console's precompiled pipeline cache (device slots 0x1c8 and 0x218) is
+  declined on purpose; the title builds the same pipelines from its ordinary
+  descriptions, so nothing is missing (upstream VIctory #3163).
 - The picture is verified by saved frames; the interface and the cutscenes are
   expected to be whole in Series S, the menus are 30 fps, the world is 6–8.
 

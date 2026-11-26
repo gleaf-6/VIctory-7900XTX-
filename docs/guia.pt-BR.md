@@ -162,8 +162,9 @@ pelas opções dele.
   assenta (são os mesmos raios que o alimentam); existe desde os primeiros
   builds e não vem das correções de imagem.
 - O frame generation deixa rastro em movimento rápido nesta taxa de quadros.
-- Algumas variantes de pipeline de console não são criadas (o título segue sem
-  elas).
+- O cache de pipelines pré-compilados do console (slots de device 0x1c8 e
+  0x218) é recusado de propósito; o título monta os mesmos pipelines pelas
+  descrições normais, então não falta nada (upstream VIctory #3163).
 - A imagem é conferida por quadros salvos; a interface e as cutscenes devem
   estar inteiras no Series S, os menus a 30 fps, o mundo a 6–8.
 

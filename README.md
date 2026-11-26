@@ -136,7 +136,6 @@ What is known to be wrong here:
   settle here (the same rays feed it); it has been there since the first
   builds and is not the picture fixes.
 - Frame generation ghosts on fast motion at 6-8 rendered frames a second.
-- A few console pipeline variants are not created; the title goes without them.
 - The first run after a driver or build change stutters while pipelines are
   made (`victory warm --used` makes them ahead).
 
@@ -247,6 +246,11 @@ are not part of this repository.
   changed, on a thread of its own (`VICTORY_RELAY`, `VICTORY_LAND`).
 - **Buffer fills that need bytes still on the card are done on the card**
   (`VICTORY_CARD_STEPS`) instead of waiting for it.
+- **The console's precompiled pipeline cache** (device slots 0x1c8 and 0x218) is
+  declined on purpose: the title then builds the same pipelines from its
+  ordinary descriptions, which the layer translates. Answering that cache
+  measured worse upstream (dropped draws per frame 82 to 1,440, 328 compute
+  shaders failing; VIctory #3163).
 - **The title's writes are caught more cheaply**: one view opened at a fault,
   blocks that rest, places in the title's code that look before they write.
 - **Textures go up on a copy queue of their own** and a slot shows one only after
@@ -287,6 +291,8 @@ commits taken from elsewhere name the commit and its author.
   every view of a page (with Spexivus, joroyt and tightfall), and Joshua Odom's
   reads into title memory.
 - **Geckomacabre** and **cxy0072019-sketch**: the texture read-back.
+- **aroqan178** (VIctory #3163): the console's precompiled pipeline cache
+  (device slots 0x1c8 and 0x218) and why it stays declined.
 - **[avatarmanz/VIctory-7900XTX](https://github.com/avatarmanz/VIctory-7900XTX)**,
   pull request #329 (Giovanni Fadanelli): the ported picture fixes and the root
   view window, from **YukiRyuu/RYUKI-7900XT** (ryuki), **victory-scarlett**

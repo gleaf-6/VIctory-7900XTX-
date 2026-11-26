@@ -346,15 +346,18 @@ fn feature_levels(data: *mut c_void) -> HRESULT {
     }
 }
 
-/// Device methods 0x1c8 and 0x218 (`SLOT`). The title calls both
-/// (title+0x2477578 and title+0x24800d5) as `(this, description, interface
-/// id, out)`, asks for `ID3D12PipelineState`, and on success keeps the
-/// object `out` names and draws with it; on failure it goes without that
-/// pipeline, silently. What the descriptions hold is not known: the calls
-/// fail as they always did, with `out` null, and the first ones log the
-/// description's words and what its first word points at, so that the two
-/// methods can be written.
-/// shortcut: not implemented. Answering `S_OK` here without making the
+/// Device methods 0x1c8 (graphics) and 0x218 (compute) (`SLOT`): the title's
+/// **cache of precompiled pipelines**, loaded from the console's binaries (a
+/// register packet, then code and metadata per stage, the title's root
+/// signature), called in one burst while loading (over 16,000 and 2,000 times
+/// a run). They must fail: on a miss the title makes the same pipeline from
+/// its ordinary description, which this layer translates (`create_stream`,
+/// `create_compute_x`), so nothing is missing. Answering 0x218 swaps
+/// translated pipelines for native-only ones that do not translate: upstream
+/// VIctory #2396 measured dropped draws per frame going from 82 to 1,440 and
+/// 328 compute shaders failing, and #3163 (aroqan178) records why the two
+/// stay unimplemented and why `out` is set to null.
+/// shortcut: not implemented on purpose. Answering `S_OK` without making the
 /// pipeline would hand the title whatever its stack held as an object.
 extern "system" fn unknown_pipeline<const SLOT: usize>(
     _: This,
@@ -392,7 +395,7 @@ extern "system" fn unknown_pipeline<const SLOT: usize>(
             calls,
             description = format_args!("{description:x?}"),
             first_points_at = format_args!("{first:x?}"),
-            "a pipeline creation method that is not implemented: the title goes without this pipeline"
+            "the title's precompiled pipeline cache is declined; it builds the same pipeline from its ordinary description"
         );
         // Who asks: the title's own code, or one of its DLLs' (the FidelityFX
         // upscaler's, on Series S, whose pipelines these would be).
