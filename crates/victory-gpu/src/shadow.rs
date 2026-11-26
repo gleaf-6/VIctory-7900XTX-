@@ -353,6 +353,51 @@ pub(crate) fn live_span_bytes() -> u64 {
         + WINDOW_MAPPED_BYTES.load(Ordering::Relaxed)
 }
 
+/// Bytes a frame's refreshes ask for, by copy of title memory: the copy's
+/// span start, its length, the bytes asked and the asks, since the last
+/// frame-rate line. Diagnostics: the top of it names the buffers a frame
+/// moves most, which is where a copy that need not happen would show.
+#[cfg(feature = "diagnostics")]
+static REFRESH_BY_COPY: std::sync::Mutex<Option<std::collections::HashMap<u64, (u64, u64, u64)>>> =
+    std::sync::Mutex::new(None);
+
+/// Counts one refresh of `len` bytes of `shadow` (diagnostics).
+#[cfg(feature = "diagnostics")]
+pub(crate) fn note_refresh(shadow: &Shadow, len: usize) {
+    let (at, size) = shadow.span();
+    let mut all = REFRESH_BY_COPY.lock().unwrap_or_else(|e| e.into_inner());
+    let entry = all.get_or_insert_with(Default::default).entry(at).or_insert((size, 0, 0));
+    entry.1 += len as u64;
+    entry.2 += 1;
+}
+
+/// [`REFRESH_BY_COPY`] per frame, said in the frame-rate line.
+#[cfg(feature = "diagnostics")]
+pub(crate) fn refresh_top_line(frames: f64) {
+    let Some(all) = REFRESH_BY_COPY.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+        return;
+    };
+    let mut rows: Vec<(u64, (u64, u64, u64))> = all.into_iter().collect();
+    if rows.is_empty() {
+        return;
+    }
+    rows.sort_unstable_by(|a, b| b.1.1.cmp(&a.1.1));
+    let total: u64 = rows.iter().map(|r| r.1.1).sum();
+    let top: Vec<String> = rows
+        .iter()
+        .take(6)
+        .map(|(at, (size, bytes, calls))| {
+            format!("{at:#x}+{size:#x}: {:.1} MB in {:.0} asks", *bytes as f64 / 1e6 / frames, *calls as f64 / frames)
+        })
+        .collect();
+    tracing::info!(
+        "refresh asked per frame: {:.1} MB in {} copies (before the dedup that skips what did not change); the largest: {}",
+        total as f64 / 1e6 / frames,
+        rows.len(),
+        top.join("; ")
+    );
+}
+
 /// [`CARD_STATS`], taken; then the copies in the card's memory, their
 /// bytes and their "before" twins' bytes.
 pub(crate) fn card_stats() -> [u64; 10] {

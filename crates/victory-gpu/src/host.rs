@@ -6977,6 +6977,8 @@ impl HostList {
         let mut deferred = self.deferred();
         let key = (std::sync::Arc::as_ptr(shadow) as usize, address, len);
         if deferred.refreshed.insert(key) {
+            #[cfg(feature = "diagnostics")]
+            crate::shadow::note_refresh(shadow, len);
             // A range that touches the one just recorded, of the same copy,
             // is one range: the draws of a frame ask for neighbours of the
             // same buffer, and each check costs about a microsecond.
@@ -8844,6 +8846,8 @@ impl Meter {
             "indirect mesh dispatches: the largest group count asked for {mesh_largest} (run: at most 65535), {mesh_groups:.0} groups asked per frame; {refused:.2} indirect records a frame ran empty for want of their list's budget (2^27), the largest cost of one {biggest} (0: under 2^22)"
         );
         crate::shadow::exact_line(frames);
+        #[cfg(feature = "diagnostics")]
+        crate::shadow::refresh_top_line(frames);
         #[cfg(feature = "diagnostics")]
         crate::watch::noop_line(frames);
         #[cfg(feature = "diagnostics")]
