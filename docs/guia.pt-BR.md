@@ -21,8 +21,8 @@ Medido numa RX 7600 8 GB / Ryzen 7 5700X:
 | | |
 |---|---|
 | menus, vídeos, telas de carregamento | 30 fps |
-| o mundo | **6–8 quadros por segundo** (~130 ms por quadro) |
-| quadros exibidos, com frame generation | **~15 por segundo** |
+| o mundo | **9–10 quadros por segundo** (94–104 ms por quadro) |
+| quadros exibidos, com frame generation | **~19 por segundo** |
 | imagem | inteira: mundo iluminado, interface, cutscenes (conferida por capturas) |
 
 **Isso não é uma experiência de 30 fps nesse hardware, e não promete ser.** O
@@ -103,12 +103,12 @@ com cor, profundidade, vetores de movimento, jitter e câmera do título.
 O frame generation da AMD, pela swap chain dele no lugar da da janela,
 alimentado pelo dispatch de upscale do título (profundidade, vetores, jitter,
 câmera, tempo de quadro): um quadro gerado entre dois renderizados, então a
-imagem aparece a cerca de **duas vezes** a taxa renderizada (≈6–8 renderizados,
-≈15 exibidos).
+imagem aparece a cerca de **duas vezes** a taxa renderizada (≈9–10 renderizados,
+≈19 exibidos).
 
 - **Ligado**: por padrão com a pasta do SDK; `-FrameGen` força,
   `-FrameGen:$false` desliga.
-- **Desligue** se incomodar: a 6–8 quadros renderizados, dois quadros ficam a
+- **Desligue** se incomodar: a 9–10 quadros renderizados, dois quadros ficam a
   ~130 ms de distância, e bordas em movimento mostram ghosting — é inerente a
   interpolar tão pouca informação, não é bug.
 - Precisa da pasta do upscaler (o upscale é quem o alimenta).
@@ -171,7 +171,7 @@ pelas opções dele.
   0x218) é recusado de propósito; o título monta os mesmos pipelines pelas
   descrições normais, então não falta nada (upstream VIctory #3163).
 - A imagem é conferida por quadros salvos; a interface e as cutscenes devem
-  estar inteiras no Series S, os menus a 30 fps, o mundo a 6–8.
+  estar inteiras no Series S, os menus a 30 fps, o mundo a 9-10.
 
 ## Mais
 

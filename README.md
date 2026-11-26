@@ -33,7 +33,8 @@ or publisher.
   memory through Resizable BAR instead of the PC's (`-WindowsBarMB auto`):
   3 GB less of the PC's memory at the same frame rate;
 - buffers kept in the card's own memory: 219.6 to 131.1 ms a frame in the
-  world, 6-8 real frames a second and about 15 shown with frame generation;
+  world, and 94-104 ms with the 32-bit heap read in place; 9-10 real frames a
+  second and about 19 shown with frame generation;
   the cap follows the card (1 GiB on the 8 GB class, 2 GiB on 16 GB cards,
   a quarter of the budget up to 8 GiB above);
 - page mappings as runs of pages, and the `codec-d/cool_fox` fork's six commits
@@ -117,8 +118,8 @@ Measured on one machine: Windows 11, Ryzen 7 5700X (8 cores / 16 threads),
 | | |
 |---|---|
 | Menus, videos, loading screens | 30 fps |
-| The world (on foot, the camp) | **6-8 fps** (120-185 ms a frame) |
-| With frame generation | **~15 fps shown** |
+| The world (on foot, the camp) | **9-10 fps** (94-104 ms a frame, with the heap in place) |
+| With frame generation | **~19 fps shown** |
 | The interface, cutscenes | whole (checked by saved frames) |
 | Video memory | 6.5-7.5 of 8 GB |
 | Picture | lit and whole; interiors with little direct light are flat (no ray-traced indirect light) |
