@@ -3284,6 +3284,7 @@ impl Shadow {
             // range, most of whose ranges differ nowhere, was most of the
             // work for small ranges.
             let (mut title, mut mask, mut runs) = (Vec::new(), Vec::new(), Vec::new());
+            let mut merged = Vec::new();
             for (at, n) in differing {
                 // SAFETY: inside the mapping; only the submitting thread
                 // writes it.
@@ -3294,10 +3295,13 @@ impl Shadow {
                     continue;
                 };
                 // Title memory as read, beside it with the card's bytes put
-                // in: only the dwords that differ are written.
-                let was: Vec<u8> = title.iter().zip(&mask).map(|(now, changed)| now ^ changed).collect();
+                // in: only the dwords that differ are written. (One buffer
+                // for every range: a fresh `Vec` per range was an allocation
+                // a range, thousands a frame.)
+                merged.clear();
+                merged.extend(title.iter().zip(&mask).map(|(now, changed)| now ^ changed));
                 if !runs.is_empty() {
-                    written += put_changed(start + at + first, &was[..n], &title[..n]);
+                    written += put_changed(start + at + first, &merged[..n], &title[..n]);
                 }
             }
             // Our write shows as a title write at the copy's next refresh,
