@@ -6971,9 +6971,34 @@ impl HostList {
         let mut deferred = self.deferred();
         let key = (std::sync::Arc::as_ptr(shadow) as usize, address, len);
         if deferred.refreshed.insert(key) {
-            deferred
-                .copies
-                .push(Step::Refresh(shadow.clone(), address, len));
+            // A range that touches the one just recorded, of the same copy,
+            // is one range: the draws of a frame ask for neighbours of the
+            // same buffer, and each check costs about a microsecond.
+            let mut merged = false;
+            if let Some(Step::Refresh(previous, at, n)) = deferred.copies.last_mut()
+                && std::sync::Arc::ptr_eq(previous, shadow)
+            {
+                let (first, end) = (*at, *at + *n);
+                let (next_first, next_end) = (address, address + len);
+                if next_first <= end && first <= next_end {
+                    *at = first.min(next_first);
+                    *n = end.max(next_end) - *at;
+                    merged = true;
+                }
+            }
+            if merged {
+                let (at, n) = match deferred.copies.last() {
+                    Some(Step::Refresh(_, at, n)) => (*at, *n),
+                    _ => (address, len),
+                };
+                deferred
+                    .refreshed
+                    .insert((std::sync::Arc::as_ptr(shadow) as usize, at, n));
+            } else {
+                deferred
+                    .copies
+                    .push(Step::Refresh(shadow.clone(), address, len));
+            }
         }
     }
 
