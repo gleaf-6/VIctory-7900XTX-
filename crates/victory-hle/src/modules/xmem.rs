@@ -186,6 +186,13 @@ pub extern "system" fn XMemVirtualAlloc(
     // makes a placeholder of it all the same.)
     if !at.is_null() && constrained && kind & MEM_COMMIT == 0 && flags & ADDRESS_32BIT != 0 {
         LOW_RESERVATIONS.lock().unwrap_or_else(|e| e.into_inner()).push((at as usize, size));
+        tracing::info!(
+            at = format_args!("{at:p}"),
+            size,
+            kind = format_args!("{kind:#x}"),
+            flags = format_args!("{flags:#x}"),
+            "renderer port 1: a 32-bit graphics reservation recorded (VICTORY_PORT_CONSTANTS)"
+        );
     }
     note_protection(asked, kind, flags, at as usize, size);
     at
