@@ -29,6 +29,9 @@ or publisher.
   1080p picture;
 - AMD frame generation through its swap chain, fed by the title's own upscale
   (depth, motion vectors, jitter, camera, frame time);
+- on cards of 16 GB and more, the windows of title memory kept in the card's
+  memory through Resizable BAR instead of the PC's (`-WindowsBarMB auto`):
+  3 GB less of the PC's memory at the same frame rate;
 - buffers kept in the card's own memory: 219.6 to 131.1 ms a frame in the
   world, 6-8 real frames a second and about 15 shown with frame generation;
   the cap follows the card (1 GiB on the 8 GB class, 2 GiB on 16 GB cards,
@@ -63,6 +66,50 @@ scripts\play-rx7600.ps1 -Exe <path of your copy's executable>
 ```
 
 ## Where it stands
+
+### On a 16 GB card: Radeon RX 9070 XT, Ryzen 7 9800X3D, 32 GB RAM
+
+The story's first scene (reached by scripted presses, the same scene every
+run), Series S profile with FSR and frame generation, 720p display mode,
+`scripts\bench.ps1` (two paired runs each, 200 s, averaged over the last
+110 s):
+
+| | before | windows in the card (`-WindowsBarMB auto`, now the default) |
+|---|---|---|
+| frames rendered a second | 21.9 (worst tenth 17.2) | **22.6** (worst tenth 18.0) |
+| frames shown (frame generation) | 42.2 | 42.4 |
+| PC memory in use (working set) | 19.7 GB | **16.6 GB** (-3.1 GB) |
+| private commit | 23.4 GB | **21.2 GB** (-2.1 GB) |
+| PC memory shared with the card | 7.5 GB | **4.4 GB** (-3.1 GB, -41%) |
+| card memory in use | 9.7 GB | 10.9 GB |
+
+What the numbers showed about this machine:
+
+- **The PC's memory was the limit, not the card.** Before the change the
+  process held 22-24 GB of commit on a 32 GB PC and the system had **843 MB
+  left to commit** at one point; the card had 5-6 GB of its budget free. Of
+  that memory, about 9 GB is the title's own (its GPU memory, write-combined,
+  as on the console) and 3-3.5 GB are *windows*: host copies of title memory
+  outside any buffer object (vertices, indices and constants from the title's
+  own allocator), which the card read over the bus.
+- **The windows now live in the card's memory, written by the CPU through
+  Resizable BAR** (`D3D12_HEAP_TYPE_GPU_UPLOAD`, `VICTORY_WINDOWS_BAR_MB`).
+  The path was in the tree but off: an 8 GB card has no room for it. On a
+  16 GB card it moves ~3 GB from the PC's memory to the card with no copy
+  left behind, and the frame rate is the same or slightly better (the reads
+  are local now). `auto` sizes it from the card's budget: none up to 12 GiB,
+  4 GiB on 16 GB cards, 6 GiB above.
+- Measured and **not** kept: a 1 MiB window grid (`VICTORY_WINDOW_KB=1024`,
+  no memory saved beyond the BAR windows) and 4 GiB of card copies of title
+  buffers (`VICTORY_CARD_BUFFERS_MB=4096`: 22.7 frames a second, worst tenth
+  17.1, against 24.6 with the default 2 GiB: the copies took the textures'
+  room).
+- The CPU is still what limits the frame (the card is idle most of it). This
+  machine's Windows sees **8 logical processors**: SMT is off in the
+  firmware. The layer runs its own translating and landing threads beside the
+  title's, so turning SMT back on is worth trying.
+
+### On an 8 GB card: Radeon RX 7600
 
 Measured on one machine: Windows 11, Ryzen 7 5700X (8 cores / 16 threads),
 32 GB RAM, Radeon RX 7600 8 GB, 1080p display, the Series S profile.
@@ -105,6 +152,37 @@ $env:VICTORY_FIDELITYFX_SDK = '<SDK>\Kits\FidelityFX\signedbin'
 scripts\play-rx7600.ps1 -Exe <path of your copy's executable>
 ```
 
+The executable may live outside the dump (renamed or not): `-TitleDir`
+(`VICTORY_TITLE_DIR`) names the package folder, which is then only read, never
+added to:
+
+```powershell
+scripts\play-rx7600.ps1 -Exe D:\game.exe -TitleDir D:\dump -FidelityFxDir D:\FidelityFX\signedbin
+```
+
+The FidelityFX folder is the SDK's `Kits\FidelityFX\signedbin` (the DX12
+loader, upscaler and frame generation DLLs, signed by AMD), from
+<https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK>.
+
+On a 16 GB card turn **Resizable BAR / Smart Access Memory** on in the
+firmware: the windows go to the card only through it (the log says
+`card memory the CPU maps supported=true`). `-WindowsBarMB 0` turns it off,
+`-WindowsBarMB 4096` forces a size. With 32 GB of RAM, a fixed page file of
+16-32 GB keeps the commit limit away from the process.
+
+To measure a change, `scripts\bench.ps1` runs the profile for a while, takes
+the same scripted path into the story's first scene, samples the process'
+memory, the card's memory and the CPU from outside, reads the frames a second
+from the log, and saves a frame to look at the picture:
+
+```powershell
+scripts\bench.ps1 -Name base -Exe D:\game.exe -TitleDir D:\dump -Play @{ FidelityFxDir = 'D:\FidelityFX\signedbin'; Stats = $true; WindowsBarMB = '0' }
+scripts\bench.ps1 -Name bar -Exe D:\game.exe -TitleDir D:\dump -Play @{ FidelityFxDir = 'D:\FidelityFX\signedbin'; Stats = $true }
+```
+
+Results go to `target\bench` (CSV, log, a PNG). Runs of the same settings
+differ by a frame or two a second: compare pairs, run in turn.
+
 The last line is the measured profile and needs the FidelityFX folder: with it,
 the script runs **Series S**, answers the console's 720p upscale with the host
 **FidelityFX (FSR)** and puts a **generated frame** between the rendered ones,
@@ -132,6 +210,24 @@ target\diag\victory.exe warm --used                     # pipelines earlier runs
 Commands, debugging switches and upstream's own description:
 [docs/README-fxceless.md](docs/README-fxceless.md). Every `VICTORY_...` switch is
 described in a comment where it is read.
+
+## Em português (resumo)
+
+Numa RX 9070 XT (16 GB) com Ryzen 7 9800X3D e 32 GB de RAM, o gargalo era a
+**RAM do PC**: o processo chegava a 22-24 GB de commit e o Windows ficou com
+menos de 1 GB de commit livre, enquanto a placa tinha 5-6 GB de VRAM sobrando.
+Agora as *janelas* de memória do título (~3 GB de vértices, índices e
+constantes) ficam **na VRAM, escritas pela CPU via Resizable BAR**
+(`-WindowsBarMB auto`, o padrão): **-3,1 GB de RAM em uso** (19,7 → 16,6 GB),
+**-41% de memória compartilhada** com a placa (7,5 → 4,4 GB), e o mesmo fps
+(21,9 → 22,6 renderizados; ~42 exibidos com frame generation). Ligue o
+**Resizable BAR / Smart Access Memory** na BIOS. O executável pode ficar fora
+da pasta do jogo com `-TitleDir` (a pasta do jogo é só lida).
+`scripts\bench.ps1` mede uma configuração do mesmo jeito sempre. Testado e
+descartado: grade de janelas de 1 MiB (não economiza mais) e 4 GiB de buffers
+na placa (mais lento). O limite continua sendo a CPU; este PC está com SMT
+desligado (8 threads lógicas), vale testar ligado. Guia completo:
+[docs/guia.pt-BR.md](docs/guia.pt-BR.md).
 
 ## What is different here
 

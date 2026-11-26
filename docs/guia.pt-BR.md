@@ -117,6 +117,8 @@ imagem aparece a cerca de **duas vezes** a taxa renderizada (≈6–8 renderizad
 | `-AmbientMost <n>` | com a estimativa, quantas vezes ela a luz de céu que o título deixou pode ficar (4 padrão; 1.5 corta) |
 | `-AmbientFloor <n>` | piso para a estimativa de luz (útil à noite) |
 | `-CardBuffers 0` | deixa de manter buffers na memória da placa (mais lento aqui; para teste) |
+| `-TitleDir <pasta>` | a pasta do jogo quando o executável está fora dela (`VICTORY_TITLE_DIR`; a pasta é só lida) |
+| `-WindowsBarMB auto/0/<n>` | janelas de memória do título na VRAM via Resizable BAR em vez da RAM (`auto`, o padrão: nada em placas de 8–12 GB, 4096 em 16 GB; na RX 9070 XT: −3 GB de RAM, mesmo fps). Precisa do Resizable BAR/SAM ligado na BIOS |
 | `-CardBuffersMB <n>` | limita essas cópias em MiB (0 = pela placa: 1 GiB em 8 GB, 2 GiB em 16 GB) |
 | `-TextureBudgetMB <n>` | limita a memória de textura: mais rápido, ao custo da luz da imagem (0 = imagem inteira) |
 | `-FillsMB <n>` | o cofre de bytes para texturas que o título preenche (96 padrão) |

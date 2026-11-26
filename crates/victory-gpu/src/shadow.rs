@@ -522,11 +522,42 @@ fn window_card_for(size: u64) -> Option<ID3D12Resource> {
 ///
 /// Windows go there while a fifth of the card's budget is free, as with
 /// [`window_room_for`], which this comes before.
+///
+/// `VICTORY_WINDOWS_BAR_MB=auto` lets the card's class decide
+/// ([`auto_windows_bar_mb`]). Measured on a 16 GB card (RX 9070 XT, the
+/// story's first scene): 4,096 MB took the PC memory the process holds from
+/// 19.4 to 16.4 GB and the memory shared with the card from 7.1 to 4.4 GB,
+/// at the same frame rate; on the 8 GB class there is no room for them.
 fn window_mapped_most() -> u64 {
     static MOST: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *MOST.get_or_init(|| {
-        std::env::var("VICTORY_WINDOWS_BAR_MB").ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0) << 20
+        let value = std::env::var("VICTORY_WINDOWS_BAR_MB").unwrap_or_default();
+        let mb = if value.trim().eq_ignore_ascii_case("auto") {
+            let budget = host().and_then(|h| h.video_memory()).map(|[budget, ..]| budget);
+            let mb = auto_windows_bar_mb(budget);
+            tracing::info!(
+                vram_budget_mb = budget.map(|b| b >> 20),
+                windows_bar_mb = mb,
+                "windows in card memory the CPU maps (VICTORY_WINDOWS_BAR_MB=auto)"
+            );
+            mb
+        } else {
+            value.trim().parse::<u64>().unwrap_or(0)
+        };
+        mb << 20
     })
+}
+
+/// [`window_mapped_most`] for `auto`, from the card's budget in bytes: none
+/// up to 12 GiB (the 8 and 12 GB classes need the card for textures),
+/// 4 GiB below 20 GiB (16 GB cards: the windows of a world are 3-3.5 GB),
+/// 6 GiB above.
+fn auto_windows_bar_mb(local_vram_budget: Option<u64>) -> u64 {
+    match local_vram_budget.map(|b| b >> 20) {
+        Some(mb) if mb > 20 * 1024 => 6144,
+        Some(mb) if mb > 12 * 1024 => 4096,
+        _ => 0,
+    }
 }
 
 /// Bytes alive of windows in card memory the CPU maps.
@@ -5485,7 +5516,7 @@ pub(crate) fn exact_line(frames: f64) {
 #[cfg(test)]
 mod window_tests {
     use super::{
-        WINDOW, cover, default_card_limits_mb, grid, holder, longest_tail, resolve_card_limits,
+        WINDOW, auto_windows_bar_mb, cover, default_card_limits_mb, grid, holder, longest_tail, resolve_card_limits,
         tail_of, window_of,
     };
 
@@ -5600,6 +5631,18 @@ mod window_tests {
         for bad in [0, 32, 100, 1000, 8192] {
             assert_eq!(grid(Some(bad)), WINDOW, "{bad}");
         }
+    }
+
+    /// `VICTORY_WINDOWS_BAR_MB=auto`: none on the 8 and 12 GB classes or an
+    /// unknown card, 4 GiB on 16 GB cards, 6 GiB above.
+    #[test]
+    fn windows_in_mapped_card_memory_follow_the_card() {
+        const GIB: u64 = 1 << 30;
+        assert_eq!(auto_windows_bar_mb(None), 0);
+        assert_eq!(auto_windows_bar_mb(Some(7 * GIB)), 0);
+        assert_eq!(auto_windows_bar_mb(Some(11 * GIB)), 0);
+        assert_eq!(auto_windows_bar_mb(Some(15 * GIB)), 4096);
+        assert_eq!(auto_windows_bar_mb(Some(23 * GIB)), 6144);
     }
 
     /// A window holds its ask and is cut on the grid; on the default grid

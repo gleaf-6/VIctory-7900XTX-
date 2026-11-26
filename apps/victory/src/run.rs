@@ -90,7 +90,23 @@ pub fn run(
         HostPolicy::default()
     });
     let wanted = |dll: &str| title_dll(&resolver.host, dll);
-    let title_dir = exe.parent().unwrap_or(Path::new("."));
+    // The package is the executable's folder, unless `VICTORY_TITLE_DIR`
+    // names another: the executable may then live (renamed or not) outside
+    // the dump, and the dump's files are only read, never added to.
+    let title_dir_override = std::env::var_os("VICTORY_TITLE_DIR")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from);
+    if let Some(dir) = &title_dir_override {
+        anyhow::ensure!(
+            dir.join("MicrosoftGame.config").is_file(),
+            "VICTORY_TITLE_DIR={} has no MicrosoftGame.config: point it at the package folder",
+            dir.display()
+        );
+    }
+    let title_dir = title_dir_override
+        .as_deref()
+        .unwrap_or_else(|| exe.parent().unwrap_or(Path::new(".")));
+    println!("package        {}", title_dir.display());
     // A missing manifest leaves id 0 and no storage quota.
     let manifest =
         std::fs::read_to_string(title_dir.join("MicrosoftGame.config")).unwrap_or_default();

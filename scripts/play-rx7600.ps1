@@ -50,6 +50,9 @@
 # shader cache elsewhere.
 param(
     [Parameter(Mandatory)][string]$Exe,
+    # The package folder when the executable is not inside it
+    # (VICTORY_TITLE_DIR): the dump is then only read.
+    [string]$TitleDir = '',
     [ValidateSet('1280x720', '1600x900', '1920x1080', '2560x1440', '3840x2160')][string]$Resolution = '1280x720',
     [switch]$RayTracing,
     [switch]$SeriesS,
@@ -104,6 +107,12 @@ param(
     # 0 lets the card's own class decide (1 GiB on the 8 GB class, 2 GiB on
     # 16 GB cards, a quarter of the budget up to 8 GiB above).
     [ValidateRange(0, 8192)][int]$CardBuffersMB = 0,
+    # Windows of title memory kept in card memory the CPU writes through a
+    # resizable BAR (VICTORY_WINDOWS_BAR_MB), instead of a copy in the PC's
+    # memory: 'auto' (the default) sizes it by the card, none on the 8 and
+    # 12 GB classes, 4096 on 16 GB cards; 0 turns it off. Needs Resizable BAR
+    # (Smart Access Memory) on in the firmware; without it nothing changes.
+    [string]$WindowsBarMB = 'auto',
     [int]$PipelineWaitMS = 24,
     [ValidateSet('diag', 'release')][string]$Build = 'diag',
     [hashtable]$More = @{}
@@ -157,6 +166,7 @@ if ($Tune) {
     $settings.VICTORY_CARD_BUFFERS_MIN_KB = '64'
     $settings.VICTORY_CARD_BUFFERS_MB = '1024'
 }
+if ($WindowsBarMB -and $WindowsBarMB -ne '0') { $settings.VICTORY_WINDOWS_BAR_MB = $WindowsBarMB }
 if ($PipelineDump) { $settings.VICTORY_PIPELINE_DUMP = $PipelineDump }
 # Simulation cut: translated shader loops stop after this many iterations per
 # lane (2^20 by default). It changes the shader cache's key for those programs.
@@ -239,9 +249,10 @@ $victory = Join-Path $PSScriptRoot "..\target\$Build\victory.exe"
 if (-not (Test-Path $victory)) { Write-Host "No $victory. Build it first (README.md)."; return }
 if (-not (Test-Path $Exe)) { Write-Host "No $Exe."; return }
 # (Other settings left over in this window go; where your files are stays.)
-$paths = 'VICTORY_CONFIG', 'VICTORY_GAME_DIR', 'VICTORY_CACHE_DIR', 'VICTORY_DATA_DIR'
+$paths = 'VICTORY_CONFIG', 'VICTORY_GAME_DIR', 'VICTORY_CACHE_DIR', 'VICTORY_DATA_DIR', 'VICTORY_TITLE_DIR'
 Get-ChildItem Env:VICTORY_* | Where-Object { $_.Name -notin $paths } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
 foreach ($k in $settings.Keys) { Set-Item "Env:$k" $settings[$k] }
+if ($TitleDir) { $env:VICTORY_TITLE_DIR = (Resolve-Path $TitleDir).Path }
 $Exe = (Resolve-Path $Exe).Path
 # Series S is the measured profile, but it needs the host upscaler: without the
 # FidelityFX folder its world comes black, so the default falls back to Series
@@ -255,12 +266,12 @@ $console = if ($seriesS) { @('--console', 'series-s') } else { @() }
 # Say which profile this run is, and what it is missing: the measured profile
 # depends on the FidelityFX folder for the upscale and for the generated frame.
 $fgOn = ($settings.VICTORY_FRAMEGEN -eq '1')
-Write-Host ("profile: {0} | FSR: {1} | frame generation: {2} | card buffers: {3} | relay {4}, inplace {5}, ambient {6}" -f `
+Write-Host ("profile: {0} | FSR: {1} | frame generation: {2} | card buffers: {3} | windows in BAR: {7} | relay {4}, inplace {5}, ambient {6}" -f `
     $(if ($seriesS) { 'Series S' } else { 'Series X' }), `
     $(if ($FidelityFxDir) { 'on' } else { 'OFF' }), `
     $(if ($fgOn) { 'on' } else { 'off' }), `
     $(if ($CardBuffers -eq 0) { 'off' } elseif ($CardBuffersMB -gt 0) { "$CardBuffersMB MB" } else { 'auto' }), `
-    $Relay, $Inplace, $settings.VICTORY_AMBIENT)
+    $Relay, $Inplace, $settings.VICTORY_AMBIENT, $(if ($settings.VICTORY_WINDOWS_BAR_MB) { $settings.VICTORY_WINDOWS_BAR_MB } else { 'off' }))
 if (-not $FidelityFxDir) {
     Write-Host 'warning: no FidelityFX folder. Series S has no upscaler to answer it and draws a black world,' -ForegroundColor Yellow
     Write-Host '         so this run falls back to Series X and is NOT the profile the numbers were measured with.' -ForegroundColor Yellow
