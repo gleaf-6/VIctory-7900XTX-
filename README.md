@@ -102,7 +102,7 @@ What the numbers showed about this machine:
 - Measured and **not** kept: a 1 MiB window grid (`VICTORY_WINDOW_KB=1024`,
   no memory saved beyond the BAR windows) and 4 GiB of card copies of title
   buffers (`VICTORY_CARD_BUFFERS_MB=4096`: 22.7 frames a second, worst tenth
-  17.1, against 24.6 with the default 2 GiB: the copies took the textures'
+  17.1, against 22.6 with the default 2 GiB: the copies took the textures'
   room).
 - The CPU is still what limits the frame (the card is idle most of it). This
   machine's Windows sees **8 logical processors**: SMT is off in the
@@ -152,6 +152,20 @@ $env:VICTORY_FIDELITYFX_SDK = '<SDK>\Kits\FidelityFX\signedbin'
 scripts\play-rx7600.ps1 -Exe <path of your copy's executable>
 ```
 
+That `scripts\play-rx7600.ps1` line is the measured profile and needs the
+FidelityFX folder: with it, the script runs **Series S**, answers the console's
+720p upscale with the host **FidelityFX (FSR)** and puts a **generated frame**
+between the rendered ones, on top of the tuning it already sets (buffers kept
+in the card's memory, `VICTORY_RELAY=2`, in-place copies off,
+`VICTORY_AMBIENT=constant:0.4`).
+
+**Without that folder there is no profile to speak of**: Series S draws a black
+world, so the script falls back to Series X and says so in the window; FSR and
+frame generation stay off. Pass the folder directly with
+`-FidelityFxDir <signedbin>` if you prefer not to set the variable.
+`-FrameGen:$false` keeps FSR without the generated frame; `-SeriesX` forces the
+bigger console.
+
 The executable may live outside the dump (renamed or not): `-TitleDir`
 (`VICTORY_TITLE_DIR`) names the package folder, which is then only read, never
 added to:
@@ -182,19 +196,6 @@ scripts\bench.ps1 -Name bar -Exe D:\game.exe -TitleDir D:\dump -Play @{ Fidelity
 
 Results go to `target\bench` (CSV, log, a PNG). Runs of the same settings
 differ by a frame or two a second: compare pairs, run in turn.
-
-The last line is the measured profile and needs the FidelityFX folder: with it,
-the script runs **Series S**, answers the console's 720p upscale with the host
-**FidelityFX (FSR)** and puts a **generated frame** between the rendered ones,
-on top of the tuning it already sets (buffers kept in the card's memory,
-`VICTORY_RELAY=2`, in-place copies off, `VICTORY_AMBIENT=constant:0.4`).
-
-**Without that folder there is no profile to speak of**: Series S draws a black
-world, so the script falls back to Series X and says so in the window; FSR and
-frame generation stay off. Pass the folder directly with
-`-FidelityFxDir <signedbin>` if you prefer not to set the variable.
-`-FrameGen:$false` keeps FSR without the generated frame; `-SeriesX` forces the
-bigger console.
 
 `-RayTracing` turns the title's ray-traced indirect light on (it is much
 heavier here); `docs/guide.en.md` explains every switch, the upscaler and
