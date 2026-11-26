@@ -738,6 +738,44 @@ pub(crate) fn writes(start: usize, end: usize, guarded: bool) -> Option<(u64, Ve
 /// asked: the submission's asking covers the range, or its blocks are known
 /// by their bits. `false` if something would have to be asked.
 pub(crate) fn nothing_new(start: usize, end: usize, base: usize, copied: &[u64], ranged: u64) -> bool {
+    #[cfg(feature = "diagnostics")]
+    let at = std::time::Instant::now();
+    let answer = nothing_new_inner(start, end, base, copied, ranged);
+    #[cfg(feature = "diagnostics")]
+    {
+        NOTHING_NEW[0].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        NOTHING_NEW[1].fetch_add(u64::from(answer), std::sync::atomic::Ordering::Relaxed);
+        NOTHING_NEW[2].fetch_add(at.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+    }
+    answer
+}
+
+/// Checks, answers and microseconds of [`nothing_new`], since the last
+/// frame-rate line: how much of a frame's refresh is spent deciding that
+/// nothing changed (the ranges that do copy are not counted here).
+#[cfg(feature = "diagnostics")]
+pub(crate) static NOTHING_NEW: [std::sync::atomic::AtomicU64; 3] = [
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+];
+
+/// [`NOTHING_NEW`] per frame, said in the frame-rate line.
+#[cfg(feature = "diagnostics")]
+pub(crate) fn noop_line(frames: f64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let [calls, noop, us] = [0, 1, 2].map(|i| NOTHING_NEW[i].swap(0, Relaxed) as f64);
+    if calls > 0.0 {
+        tracing::info!(
+            "refresh checks per frame: {:.0} ranges checked, {:.0} known to copy nothing, {:.1} ms deciding so",
+            calls / frames,
+            noop / frames,
+            us / 1000.0 / frames
+        );
+    }
+}
+
+fn nothing_new_inner(start: usize, end: usize, base: usize, copied: &[u64], ranged: u64) -> bool {
     let (first, last) = (start / PAGE, end.div_ceil(PAGE));
     // The bits first, then the journal, as in `writes`.
     let known = published(start, end);
