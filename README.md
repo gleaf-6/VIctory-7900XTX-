@@ -250,6 +250,13 @@ are not part of this repository.
   its upload ran, which also ended a device loss that came every 15 minutes or so.
 - **Boats float**: textures that shaders write and the title's CPU reads go back
   to title memory (from fxceless and Geckomacabre, on by default here).
+- **The picture fixes ported from RYUKI-7900XT and Scarlett** (through
+  [avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329)):
+  NaN and infinity in a colour export become numbers, d16 image loads keep an
+  integer view's bits, early depth is declared where the container asks for it,
+  spills are followed only inside the wave, an aliased view is copied again when
+  its card-written source changes, and a root view's window reaches the memory
+  committed around its 4 MiB cell (a device removal in the prologue).
 - **Frame record and replay** with per-pass times and shader variants compared
   turn by turn ([docs/replay.md](docs/replay.md)).
 
@@ -277,6 +284,11 @@ commits taken from elsewhere name the commit and its author.
   every view of a page (with Spexivus, joroyt and tightfall), and Joshua Odom's
   reads into title memory.
 - **Geckomacabre** and **cxy0072019-sketch**: the texture read-back.
+- **[avatarmanz/VIctory-7900XTX](https://github.com/avatarmanz/VIctory-7900XTX)**,
+  pull request #329 (Giovanni Fadanelli): the ported picture fixes and the root
+  view window, from **YukiRyuu/RYUKI-7900XT** (ryuki), **victory-scarlett**
+  (myokex's early depth, Neptune's NaN guard), **zocram4cc** and
+  **codec-d/cool_fox**.
 - **[XCL](https://github.com/ivall/xcl)** (GPL-2.0-only) was read for how the same
   title behaves under another layer; no code of it is here.
 

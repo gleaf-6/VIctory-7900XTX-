@@ -72,6 +72,16 @@ leaves FSR and frame generation off.
 | title memory used in place | `VICTORY_INPLACE=2` |
 | copy-back beside the frame | `VICTORY_RELAY=2` |
 
+The picture fixes ported from RYUKI-7900XT and Scarlett (through
+[avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329))
+are on by default: NaN and infinity in a colour export become numbers
+(`VICTORY_NAN_GUARD`), d16 image loads keep an integer view's bits
+(`VICTORY_D16_BITS`), early depth is declared where the container asks for it
+(`VICTORY_EARLY_DEPTH`), spills are followed only inside the wave
+(`VICTORY_SPILL_STRICT`) — `=0` turns each off — and a root view's window
+reaches the memory committed around its 4 MiB cell (`VICTORY_ROOT_WINDOW_MB`,
+32; `4` is the cell alone, as before).
+
 ## The upscaler (FSR)
 
 The Series S build asks the console for an upscale of its 720p picture to

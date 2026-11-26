@@ -73,6 +73,16 @@ e frame generation desligados.
 | memória do título usada no lugar | `VICTORY_INPLACE=2` |
 | copy-back ao lado do quadro | `VICTORY_RELAY=2` |
 
+As correções de imagem portadas do RYUKI-7900XT e do Scarlett (via
+[avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329))
+vêm ligadas: NaN e infinito num export de cor viram números
+(`VICTORY_NAN_GUARD`), os loads d16 mantêm os bits de uma view inteira
+(`VICTORY_D16_BITS`), early depth é declarado onde o contêiner pede
+(`VICTORY_EARLY_DEPTH`), spills só são seguidos dentro da wave
+(`VICTORY_SPILL_STRICT`) — `=0` desliga cada um — e a janela de uma root view
+alcança a memória commitada ao redor da célula de 4 MiB
+(`VICTORY_ROOT_WINDOW_MB`, 32; `4` volta a ser a célula sozinha).
+
 ## O upscaler (FSR)
 
 O build de Series S pede ao console um upscale do quadro de 720p para 1080p.
