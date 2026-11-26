@@ -6585,7 +6585,18 @@ impl<'a> Lower<'a> {
         (first, props, image, uav, used)
         };
         let src = Source::Loaded { load: site, first };
-        let h = self.handle(site, &src, false, props)?;
+        // A buffer's size is asked through a handle of its own, marked non-uniform. AMD's
+        // compiler (`amdxc64.dll`, RX 9070 XT, driver 32.0.32029.2010) reads a null pointer
+        // compiling the query through a uniform heap handle, the one the buffer's loads use,
+        // and the process ends: five of the title's compute programs (tree skinning and
+        // animation, skinned particles, a ped material's ray resolve) did so. A descriptor
+        // loaded per lane keeps its own handle, non-uniform already.
+        let h = if image.is_none() && !self.x.res.waterfall.loads.contains(&site) {
+            let index = self.heap_index(site, first, false)?;
+            self.s.size_handle(self.cur, index, props)
+        } else {
+            self.handle(site, &src, false, props)?
+        };
         let c = self.cur;
         let i32t = self.s.t.i32;
         let dims = self.s.m.named_struct("dx.types.Dimensions", vec![i32t; 4]);
