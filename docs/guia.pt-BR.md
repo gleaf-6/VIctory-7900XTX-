@@ -158,6 +158,9 @@ pelas opções dele.
 
 - Interiores com pouca luz direta ficam chapados ou estourados: a luz indireta
   por ray tracing do título não roda aqui; `VICTORY_AMBIENT` é um stand-in.
+- As sombras piscam de quadro a quadro: o resolve temporal de sombra não
+  assenta (são os mesmos raios que o alimentam); existe desde os primeiros
+  builds e não vem das correções de imagem.
 - O frame generation deixa rastro em movimento rápido nesta taxa de quadros.
 - Algumas variantes de pipeline de console não são criadas (o título segue sem
   elas).

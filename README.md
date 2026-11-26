@@ -132,6 +132,9 @@ What is known to be wrong here:
 
 - Interiors with little direct light are flat or blown out: the title's
   ray-traced indirect light does not run, and `VICTORY_AMBIENT` stands in.
+- Shadows flicker from frame to frame: the temporal shadow resolve does not
+  settle here (the same rays feed it); it has been there since the first
+  builds and is not the picture fixes.
 - Frame generation ghosts on fast motion at 6-8 rendered frames a second.
 - A few console pipeline variants are not created; the title goes without them.
 - The first run after a driver or build change stutters while pipelines are

@@ -153,6 +153,9 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
 
 - Interiors with little direct light are flat or blown out: the title's
   ray-traced indirect light does not run here; `VICTORY_AMBIENT` is a stand-in.
+- Shadows flicker from frame to frame: the temporal shadow resolve does not
+  settle here (the same rays feed it); it has been there since the first builds
+  and is not the picture fixes.
 - Frame generation ghosts on fast motion at this frame rate.
 - A few console pipeline variants are not made (the title goes without them).
 - The picture is verified by saved frames; the interface and the cutscenes are
