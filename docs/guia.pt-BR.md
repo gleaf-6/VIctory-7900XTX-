@@ -161,6 +161,10 @@ pelas opções dele.
 - As sombras piscam de quadro a quadro: o resolve temporal de sombra não
   assenta (são os mesmos raios que o alimentam); existe desde os primeiros
   builds e não vem das correções de imagem.
+- Em drivers onde o compilador da AMD encerra o processo em `amdxc64+0x861b9f`
+  (tamanho de buffer lido pelo handle uniforme), o branch `port/1213-dims`
+  traz o fix do fxceless #1213; ele não está aqui porque compila errado o
+  cabelo na RX 7600, onde esse crash não acontece.
 - O frame generation deixa rastro em movimento rápido nesta taxa de quadros.
 - O cache de pipelines pré-compilados do console (slots de device 0x1c8 e
   0x218) é recusado de propósito; o título monta os mesmos pipelines pelas

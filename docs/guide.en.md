@@ -156,6 +156,10 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
 - Shadows flicker from frame to frame: the temporal shadow resolve does not
   settle here (the same rays feed it); it has been there since the first builds
   and is not the picture fixes.
+- On drivers where AMD's compiler ends the process at `amdxc64+0x861b9f` (a
+  buffer's size read through the uniform handle), the branch `port/1213-dims`
+  carries fxceless #1213's fix; it is not here because it miscompiles hair on
+  the RX 7600, where that crash does not happen.
 - Frame generation ghosts on fast motion at this frame rate.
 - The console's precompiled pipeline cache (device slots 0x1c8 and 0x218) is
   declined on purpose; the title builds the same pipelines from its ordinary
