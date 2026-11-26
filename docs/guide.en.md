@@ -71,6 +71,7 @@ leaves FSR and frame generation off.
 | the indirect light stand-in | `VICTORY_AMBIENT=constant:0.4` (a level, shaded in creases) |
 | title memory used in place | `VICTORY_INPLACE=2` |
 | copy-back beside the frame | `VICTORY_RELAY=2` |
+| the 32-bit graphics heap in place | `VICTORY_PORT_CONSTANTS=1`: the card reads and writes the title's 174 MB buffer where it has it, no copy (150-157 to 94-104 ms a frame in the open world) |
 
 The picture fixes ported from RYUKI-7900XT and Scarlett (through
 [avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329))

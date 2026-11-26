@@ -72,6 +72,7 @@ e frame generation desligados.
 | o stand-in de luz indireta | `VICTORY_AMBIENT=constant:0.4` (um nível, sombreado nas dobras) |
 | memória do título usada no lugar | `VICTORY_INPLACE=2` |
 | copy-back ao lado do quadro | `VICTORY_RELAY=2` |
+| o heap gráfico de 32 bits in place | `VICTORY_PORT_CONSTANTS=1`: a placa lê e escreve o buffer de 174 MB onde o título o tem, sem cópia (150-157 → 94-104 ms por quadro no mundo aberto) |
 
 As correções de imagem portadas do RYUKI-7900XT e do Scarlett (via
 [avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329))

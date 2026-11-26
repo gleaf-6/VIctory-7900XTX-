@@ -268,6 +268,11 @@ are not part of this repository.
   spills are followed only inside the wave, an aliased view is copied again when
   its card-written source changes, and a root view's window reaches the memory
   committed around its 4 MiB cell (a device removal in the prologue).
+- **the title's 32-bit graphics heap read in place** (Belobug's renderer
+  port 1, `VICTORY_PORT_CONSTANTS`, on by default here): a second view of the
+  heap's section opened as a host heap, its 174 MB buffer read and written by
+  the card where the title has it, with no copy and no fill. Measured here in
+  the open world: 150-157 to 94-104 ms a frame, the copies from 90-100 to 57 MB.
 - **Frame record and replay** with per-pass times and shader variants compared
   turn by turn ([docs/replay.md](docs/replay.md)).
 
@@ -284,7 +289,8 @@ commits taken from elsewhere name the commit and its author.
 - **[DexNom/VIctory](https://github.com/DexNom/VIctory)**: ray tracing fixes,
   cube gradients, sparse textures.
 - **[Belobug/VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD)**:
-  the ambient light idea, pipeline workers, and work by romainhedouin.
+  the ambient light idea, pipeline workers, work by romainhedouin, and the
+  renderer ports (the title's 32-bit graphics heap read in place).
 - **[codec-d/cool_fox](https://github.com/codec-d/cool_fox)**: the performance
   work merged here (deferred descriptor records, bindless refreshes scoped to
   their heap, textures ahead, residency, pool back-off).

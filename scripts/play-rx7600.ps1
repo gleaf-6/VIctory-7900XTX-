@@ -134,6 +134,15 @@ $settings = @{
     # darken the picture on this machine (the title's light textures are ones
     # it fills, and both take copies of those away): off by default.
     VICTORY_LEVELS_ON_DEMAND = "$LevelsOnDemand"
+    # Renderer port 1 (Belobug's, `VICTORY_PORT_CONSTANTS`): the title's 185 MB
+    # 32-bit graphics heap is opened as a host heap in a view of its section,
+    # and the buffers in it are read and written by the card where the title
+    # has them: no host copy, nothing sent up or fetched back for them.
+    # Measured here in the open world: 150-157 ms -> 94-104 ms a frame, the
+    # copies 90-100 MB -> 57 MB. `-Set VICTORY_PORT_CONSTANTS=0` turns it off
+    # (it refuses by itself, falling back to copies, on a build whose heap is
+    # not one stretch of one section).
+    VICTORY_PORT_CONSTANTS = '1'
     # Windows of title memory on a 256 KiB grid: every window is the PC's
     # memory in full, however little of it is read (`shadow.rs`, `window`).
     VICTORY_WINDOW_KB = "$WindowKB"
