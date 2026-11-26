@@ -149,6 +149,8 @@ fn mirror(handle: u64) {
     let Some(index) = heap.index(handle) else {
         return;
     };
+    // Renderer port #2: its record is looked at again with the title's own.
+    crate::port_descriptors::mark(handle);
     let mut pending = heap.pending.lock().unwrap_or_else(|e| e.into_inner());
     match heap.host.get() {
         None => pending.push(index),
@@ -339,15 +341,49 @@ pub(crate) fn sync_heaps() {
         kinds[4] += before.len() as u64 - of_tables;
         // Those of the changed pages, made together at the end.
         let mut make: Vec<u32> = Vec::new();
-        let began = std::time::Instant::now();
-        let taken = written.take(start as usize, end as usize);
-        spent[0] += since(began);
-        let mut parts: Vec<(usize, usize)> = Vec::new();
-        for (range_from, range_end) in taken {
-            let mut page = range_from & !(crate::watch::PAGE - 1);
-            while page < range_end {
-                parts.push((page.max(range_from), (page + crate::watch::PAGE).min(range_end)));
-                page += crate::watch::PAGE;
+        // Ranges of the heap to look at, and whether a range is one the
+        // fallback of renderer port #2 looks at whole.
+        let mut parts: Vec<(usize, usize, bool)> = Vec::new();
+        let port = crate::port_descriptors::adopted(start);
+        if port {
+            // Renderer port #2: the slots the title's patched stores and our
+            // calls marked, in place of the changed pages; and a few of the
+            // pages the watch says were written, looked at whole.
+            for (first, n) in crate::port_descriptors::take(start).unwrap_or_default() {
+                let from = start as usize + first as usize * step as usize;
+                parts.push((from, from + n as usize * step as usize, false));
+            }
+            if crate::port_descriptors::ask_due(frame) {
+                let began = std::time::Instant::now();
+                let taken = written.take(start as usize, end as usize);
+                spent[0] += since(began);
+                crate::port_descriptors::asked(&taken);
+            }
+            for page in crate::port_descriptors::to_check(frame) {
+                parts.push((page.max(start as usize), (page + crate::watch::PAGE).min(end as usize), true));
+            }
+            // The marks come one slot at a time and scattered: a read for
+            // each was 27 ms of kernel calls for 4 MB. Neighbours within a
+            // page are read together (the gap is compared away as unchanged).
+            parts.sort_unstable_by_key(|p| p.0);
+            let mut together: Vec<(usize, usize, bool)> = Vec::new();
+            for (from, to, check) in parts.drain(..) {
+                match together.last_mut() {
+                    Some(last) if !last.2 && !check && from <= last.1 + crate::watch::PAGE => last.1 = last.1.max(to),
+                    _ => together.push((from, to, check)),
+                }
+            }
+            parts = together;
+        } else {
+            let began = std::time::Instant::now();
+            let taken = written.take(start as usize, end as usize);
+            spent[0] += since(began);
+            for (range_from, range_end) in taken {
+                let mut page = range_from & !(crate::watch::PAGE - 1);
+                while page < range_end {
+                    parts.push((page.max(range_from), (page + crate::watch::PAGE).min(range_end), false));
+                    page += crate::watch::PAGE;
+                }
             }
         }
         // A few pages a thread at a time: read, compared with what was last
@@ -361,7 +397,7 @@ pub(crate) fn sync_heaps() {
             let mut out = SyncPart::default();
             let mut page_bytes: Vec<u8> = Vec::new();
             let mut changed: Vec<u32> = Vec::new();
-            for &(from, to) in parts.chunks(SYNC_PAGES).nth(n).unwrap_or_default() {
+            for &(from, to, _check) in parts.chunks(SYNC_PAGES).nth(n).unwrap_or_default() {
                 // The page's records are read through the kernel, into a
                 // copy: a page the title unmaps meanwhile fails the read
                 // where 2,048 reads in place would fault.
@@ -395,6 +431,13 @@ pub(crate) fn sync_heaps() {
                             .and_then(|b| b.try_into().ok())
                             .map_or(0, u32::from_le_bytes)
                     };
+                    // Renderer port #2: a slot the marks did not name.
+                    crate::port_descriptors::missed(
+                        index,
+                        start + u64::from(index) * step,
+                        !samplers && word(0) == VIEW_TAG,
+                        host.copied_tabled(index, frame),
+                    );
                     if !samplers && word(0) == VIEW_TAG {
                         // A draw's own table: the draw makes what it
                         // reads of it (`draw.rs` `tables`).
@@ -522,6 +565,8 @@ static SYNC_SPLIT: [std::sync::atomic::AtomicU64; 5] = [const { std::sync::atomi
 /// Nothing while no heap page changed.
 #[cfg(windows)]
 pub(crate) fn sync_line(frames: f64) {
+    #[cfg(windows)]
+    crate::port_descriptors::line(frames);
     let [twins, moved, lost] = [0, 1, 2].map(|i| host::TWINS[i].swap(0, std::sync::atomic::Ordering::Relaxed));
     if twins > 0 {
         tracing::info!(
@@ -664,6 +709,7 @@ impl Drop for Heap {
         let at = std::ptr::from_ref::<Heap>(self) as usize;
         let mut heaps = SHADER_HEAPS.write().unwrap_or_else(|e| e.into_inner());
         heaps.retain(|&(_, _, h)| h != at);
+        crate::port_descriptors::let_go(self.start);
     }
 }
 
@@ -1504,6 +1550,11 @@ pub(crate) extern "system" fn create_heap(
             .then(|| crate::watch::track(start as usize, size as usize, true))
             .flatten(),
     });
+    // Renderer port #2: the title's own stores tell this heap's slots.
+    #[cfg(windows)]
+    if placed && visible && desc.kind == VIEWS_KIND {
+        crate::port_descriptors::adopt(start, desc.count);
+    }
     #[cfg(windows)]
     if visible {
         let at = std::ptr::from_ref::<Heap>(&heap) as usize;
