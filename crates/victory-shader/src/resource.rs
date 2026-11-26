@@ -2313,14 +2313,22 @@ pub(crate) enum Moved {
     Value(Value),
 }
 
+/// (cool_fox 8cc31ab, Scarlett's switch) `VICTORY_SPILL_STRICT` (default 1; =0: spills
+/// followed through lane moves with modifiers or lanes past the wave too, as before).
+fn spill_strict() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_SPILL_STRICT").is_none_or(|v| v != "0"))
+}
+
 fn plain_lane(v: &crate::gfx10::Valu) -> bool {
-    v.abs == 0
-        && v.neg == 0
-        && v.opsel == 0
-        && !v.clamp
-        && v.omod == 0
-        && v.sdwa.is_none()
-        && v.dpp.is_none()
+    !spill_strict()
+        || (v.abs == 0
+            && v.neg == 0
+            && v.opsel == 0
+            && !v.clamp
+            && v.omod == 0
+            && v.sdwa.is_none()
+            && v.dpp.is_none())
 }
 
 impl Tracer<'_> {
@@ -2337,7 +2345,7 @@ impl Tracer<'_> {
             return None;
         };
         let lane = lane_of(lane)?;
-        if lane >= if self.p.wave64 { 64 } else { 32 } {
+        if spill_strict() && lane >= if self.p.wave64 { 64 } else { 32 } {
             return None;
         }
         self.spilled(inst.read(Reg::V(reg))?, lane, block, &mut Vec::new())
@@ -2388,7 +2396,7 @@ impl Tracer<'_> {
             return Err(());
         }
         let written = lane_of(*at).ok_or(())?;
-        if written >= if self.p.wave64 { 64 } else { 32 } {
+        if spill_strict() && written >= if self.p.wave64 { 64 } else { 32 } {
             return Err(());
         }
         if written != lane {
@@ -2425,9 +2433,15 @@ fn copy_source(inst: &Inst, k: usize) -> Option<Moved> {
         return Some(Moved::Const(i32::from((*imm)? as i16) as u32));
     }
     // A mask of S0 bits from bit S1, as the upscaler's compiler makes an
-    // immediate sampler's word.
-    if let ("s_bfm_b32", 0, [Operand::Const(w), Operand::Const(at)]) = (inst.name(), k, &src[..]) {
-        let (w, at) = (inline(*w)? & 31, inline(*at)? & 31);
+    // immediate sampler's word (inline constants or 32-bit literals).
+    if let ("s_bfm_b32", 0) = (inst.name(), k) {
+        let constant = |o: &Operand| match *o {
+            Operand::Const(c) => inline(c),
+            Operand::Literal(x) => Some(x),
+            _ => None,
+        };
+        let w = constant(src.first()?)? & 31;
+        let at = constant(src.get(1)?)? & 31;
         return Some(Moved::Const(((1u32 << w) - 1) << at));
     }
     let src = src.first()?;
