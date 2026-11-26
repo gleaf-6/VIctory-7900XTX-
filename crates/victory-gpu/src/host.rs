@@ -1199,6 +1199,10 @@ pub(crate) struct HostList {
     /// depends on ([`HostList::changed_something`]); no two lists have the
     /// same.
     epoch: std::sync::atomic::AtomicU64,
+    /// The pipeline of the list's last draw, for the diagnostics line of
+    /// draws that repeat it.
+    #[cfg(feature = "diagnostics")]
+    pub(crate) last_pipe: std::sync::atomic::AtomicUsize,
     /// Counts the list in [`ALIVE`] while it lives.
     _alive: Counted,
     /// The texts of the markers `note_op` set, in order (for device-removed
@@ -4166,6 +4170,8 @@ impl Host {
                 scratch: Mutex::default(),
                 states: Mutex::default(),
                 twins: Mutex::default(),
+                #[cfg(feature = "diagnostics")]
+                last_pipe: std::sync::atomic::AtomicUsize::new(0),
                 prelude,
                 pipelines,
                 #[cfg(feature = "diagnostics")]
@@ -8840,6 +8846,8 @@ impl Meter {
         crate::shadow::exact_line(frames);
         #[cfg(feature = "diagnostics")]
         crate::watch::noop_line(frames);
+        #[cfg(feature = "diagnostics")]
+        crate::draw::pipeline_line(frames);
         crate::descriptor::sync_line(frames);
         late_line(frames);
         crate::queue::behind_line(frames);

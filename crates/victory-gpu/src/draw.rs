@@ -566,6 +566,38 @@ fn mesh_kept(pipeline: usize) -> bool {
 /// Draws recorded on the host GPU since the last frame line.
 static DRAWN: AtomicU64 = AtomicU64::new(0);
 
+/// Draws counted, and those that bound the pipeline the draw before them on
+/// the same list bound: what a per-draw state cache could leave out, as an
+/// upper bound (two draws of one pipeline still differ in their vertex and
+/// descriptor state).
+#[cfg(feature = "diagnostics")]
+pub(crate) static PIPELINE_REPEATS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
+/// Counts a draw of `pipeline` on `list` (diagnostics).
+#[cfg(feature = "diagnostics")]
+pub(crate) fn note_pipeline(list: &crate::host::HostList, pipeline: usize) {
+    let p = pipeline;
+    let previous = list.last_pipe.swap(p, Ordering::Relaxed);
+    PIPELINE_REPEATS[0].fetch_add(1, Ordering::Relaxed);
+    if previous == p {
+        PIPELINE_REPEATS[1].fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// [`PIPELINE_REPEATS`] per frame, said in the frame-rate line.
+#[cfg(feature = "diagnostics")]
+pub(crate) fn pipeline_line(frames: f64) {
+    let [all, repeats] = [0, 1].map(|i| PIPELINE_REPEATS[i].swap(0, Ordering::Relaxed) as f64);
+    if all > 0.0 {
+        tracing::info!(
+            "draws per frame: {:.0}, {:.0} of them ({:.0}%) bind the pipeline the draw before them bound (a state cache's upper bound)",
+            all / frames,
+            repeats / frames,
+            100.0 * repeats / all
+        );
+    }
+}
+
 /// Draws run on the host so far.
 pub(crate) fn drawn() -> u64 {
     DRAWN.load(Ordering::Relaxed)
@@ -4011,6 +4043,8 @@ impl State {
         first_instance: u32,
     ) {
         self.window = None;
+        #[cfg(feature = "diagnostics")]
+        note_pipeline(list, self.pipeline);
         crate::pipeline::note(self.pipeline as _, &self.targets, self.depth);
         #[cfg(feature = "diagnostics")]
         self.trace("draw", vertices, first);
@@ -4121,6 +4155,8 @@ impl State {
         first_instance: u32,
     ) {
         self.window = None;
+        #[cfg(feature = "diagnostics")]
+        note_pipeline(list, self.pipeline);
         crate::pipeline::note(self.pipeline as _, &self.targets, self.depth);
         #[cfg(feature = "diagnostics")]
         self.trace("indexed", indices, first);
