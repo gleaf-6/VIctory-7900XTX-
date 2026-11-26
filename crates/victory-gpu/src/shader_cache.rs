@@ -93,7 +93,7 @@ fn build() -> [u8; 32] {
         // bytes. Only when on, so the translations cached without it keep
         // their key.
         if victory_shader::emit::constants_raw() {
-            bytes.extend_from_slice(b"VICTORY_PORT_CBV=1");
+            bytes.extend_from_slice(b"VICTORY_PORT_CBV=2");
         }
         bytes
     });

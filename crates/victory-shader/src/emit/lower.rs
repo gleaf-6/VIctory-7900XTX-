@@ -6868,6 +6868,9 @@ impl<'a> Lower<'a> {
             return Ok(None);
         }
         if let Source::Built { address, .. } = src {
+            // WIP: the host does not bind the root SRV this needs yet.
+            return Ok(None);
+            #[allow(unreachable_code)]
             if self.root_copy.is_some() {
                 return Ok(None);
             }
