@@ -30,6 +30,12 @@
 //!
 //! `VICTORY_AMBIENT_SHADE=<strength>,<radius in metres>` sets the creases.
 //!
+//! `VICTORY_AMBIENT_MOST=<multiple>` (4 unless set) bounds what the title's
+//! program left by that multiple of the estimate: with the rays off it holds
+//! the **sky's** light indoors, and a white surface lit only by it (paper, a
+//! wall in the shade) comes out lavender, while what the sun or a lamp
+//! reaches stays white.
+//!
 //! The air of a room is lit by the same probes: without rays they hold the
 //! sky's light indoors too, a brown veil at sunset. `VICTORY_AMBIENT_AIR`
 //! bounds what the air scatters by a multiple of the light around.
@@ -109,6 +115,23 @@ fn air() -> f32 {
     *SET.get_or_init(|| {
         let set = std::env::var("VICTORY_AMBIENT_AIR").unwrap_or_default();
         set.trim().parse().ok().filter(|v: &f32| v.is_finite() && *v > 0.0).unwrap_or(0.0)
+    })
+}
+
+/// How many times the estimate the light the title's program left may be
+/// kept at (`VICTORY_AMBIENT_MOST=<multiple>`, 4 unless set).
+///
+/// With the rays off, that program leaves the **sky's** light indoors: a
+/// white surface lit only indirectly (the papers of a room, a wall in the
+/// shade) takes the sky's blue and comes out lavender, while what the sun or
+/// a lamp reaches stays white. Outdoors the estimate is the sky itself, so a
+/// smaller multiple still keeps it; indoors it cuts what the rays would not
+/// have brought there.
+fn most() -> f32 {
+    static SET: OnceLock<f32> = OnceLock::new();
+    *SET.get_or_init(|| {
+        let set = std::env::var("VICTORY_AMBIENT_MOST").unwrap_or_default();
+        set.trim().parse().ok().filter(|v: &f32| v.is_finite() && *v > 0.0).unwrap_or(4.0)
     })
 }
 
@@ -459,7 +482,7 @@ pub(crate) fn after(list: &HostList, role: Role, views: &Views) -> bool {
     words[6] = views.size[0];
     words[7] = views.size[1];
     words[8] = 0.04f32.to_bits();
-    words[9] = 4.0f32.to_bits();
+    words[9] = most().to_bits();
     words[10] = air().to_bits();
     let l = &list.list;
     // SAFETY: an open list with the heap of the views set; the title's

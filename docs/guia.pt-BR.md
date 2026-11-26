@@ -69,7 +69,7 @@ e frame generation desligados.
 | **frame generation** | `VICTORY_FRAMEGEN=1`, ligado por padrão quando a pasta do SDK é dada |
 | os dois planes de apresentação compostos | automático (o Series S apresenta dois) |
 | buffers mantidos na memória da placa | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=1024` |
-| o stand-in de luz indireta | `VICTORY_AMBIENT=0.4` |
+| o stand-in de luz indireta | `VICTORY_AMBIENT=constant:0.4` (um nível, sombreado nas dobras) |
 | memória do título usada no lugar | `VICTORY_INPLACE=2` |
 | copy-back ao lado do quadro | `VICTORY_RELAY=2` |
 
@@ -112,7 +112,9 @@ imagem aparece a cerca de **duas vezes** a taxa renderizada (≈6–8 renderizad
 | `-FidelityFxDir <pasta>` | o `signedbin` do SDK: upscaler de host e frame generation |
 | `-FrameGen` / `-FrameGen:$false` | frame generation ligado / desligado |
 | `-Async` | submissões preparadas por uma thread nossa: mesmo quadro, menos artefatos de streaming |
-| `-Ambient <0..1>` | o stand-in de luz indireta (0.4 padrão; 0.2/0 mais escuro, 0.8 mais cheio) |
+| `-Ambient <0..1>` | o stand-in de luz indireta, um nível constante (0.4 padrão; 0.2/0 mais escuro, 0.8 mais cheio) |
+| `-AmbientSpec <spec>` | `0.4` para usar uma fração da estimativa (segue a hora e as lâmpadas, mas mantém o azul do céu no interior: papel branco sai lavanda) |
+| `-AmbientMost <n>` | com a estimativa, quantas vezes ela a luz de céu que o título deixou pode ficar (4 padrão; 1.5 corta) |
 | `-AmbientFloor <n>` | piso para a estimativa de luz (útil à noite) |
 | `-CardBuffers 0` | deixa de manter buffers na memória da placa (mais lento aqui; para teste) |
 | `-TextureBudgetMB <n>` | limita a memória de textura: mais rápido, ao custo da luz da imagem (0 = imagem inteira) |

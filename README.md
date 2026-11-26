@@ -107,7 +107,7 @@ The last line is the measured profile and needs the FidelityFX folder: with it,
 the script runs **Series S**, answers the console's 720p upscale with the host
 **FidelityFX (FSR)** and puts a **generated frame** between the rendered ones,
 on top of the tuning it already sets (buffers kept in the card's memory,
-`VICTORY_RELAY=2`, in-place copies off, `VICTORY_AMBIENT=0.4`).
+`VICTORY_RELAY=2`, in-place copies off, `VICTORY_AMBIENT=constant:0.4`).
 
 **Without that folder there is no profile to speak of**: Series S draws a black
 world, so the script falls back to Series X and says so in the window; FSR and

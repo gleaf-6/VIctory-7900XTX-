@@ -25,6 +25,11 @@
 # -RayTracing   the title's own ray-traced indirect light: lit interiors,
 #               about a third slower
 # -Stats        keep the diagnostics build's statistics (VICTORY_LOG=info)
+# -Ambient      the indirect light stand-in: a constant level (0.4 default),
+#               shaded in creases. -AmbientSpec 0.4 goes back to a share of
+#               the estimate (follows the hour and the lamps, but keeps the
+#               sky's blue indoors: white paper comes out lavender), and
+#               -AmbientMost 1.5 cuts how much of that sky it keeps.
 # -SeriesS      force the smaller console (the default when -FidelityFxDir or
 #               VICTORY_FIDELITYFX_SDK is given)
 # -SeriesX      force the bigger console (the default without the SDK: it
@@ -58,6 +63,10 @@ param(
     [switch]$Stats,
     [double]$Ambient = 0.4,
     [string]$AmbientSpec = '',
+    # The multiple of the estimate the title's own (sky) light may be kept at
+    # (VICTORY_AMBIENT_MOST; 0: as is, 4). Indoors, with the rays off, that
+    # sky light is what turns white paper lavender: 1.5 cuts it.
+    [double]$AmbientMost = 0,
     [ValidateRange(0, 1048576)][int]$LoopLimit = 0,
     [string]$SkipPipelines = '',
 # The FidelityFX SDK's `signedbin` (its `amd_fidelityfx_upscaler_dx12.dll`),
@@ -121,13 +130,16 @@ $settings = @{
     # a second: the draws that need it are left out of the frames until it is
     # there (500 ms by default; `win 24`, README `VICTORY_PIPELINE_WAIT_MS`).
     VICTORY_PIPELINE_WAIT_MS = "$PipelineWaitMS"
-    # The stand-in for the indirect light the title's rays would bring. A
-    # constant level, modulated by the creases' occlusion (the `open` term),
-    # not a share of the estimate: measured here, 1.6 of the estimate left the
+    # The stand-in for the indirect light the title's rays would bring: a
+    # constant level (`constant:<Ambient>`), modulated by the creases'
+    # occlusion (the `open` term). Measured here, 1.6 of the estimate left the
     # night scenes black and 2.5 washed the picture into a beige veil, while
     # `constant:0.1` showed the room lit and cost nothing (255 ms either way).
-    # -AmbientSpec '' -Ambient 1.2 goes back to the estimate.
-    VICTORY_AMBIENT = $(if ($AmbientSpec) { $AmbientSpec } elseif ($Ambient -le 0) { '0' } else { "$Ambient" })
+    # A share of the estimate follows the hour and the lamps, but with the
+    # rays off it also holds the sky's light indoors: white paper lit only
+    # indirectly comes out lavender (the prison). `-AmbientSpec 0.4` goes back
+    # to the estimate; `-AmbientMost 1.5` cuts the sky it keeps.
+    VICTORY_AMBIENT = $(if ($AmbientSpec) { $AmbientSpec } elseif ($Ambient -le 0) { '0' } else { "constant:$Ambient" })
 }
 if (-not $Stats) { $settings.VICTORY_LOG = 'warn' }
 if ($RayTracing) { $settings.VICTORY_BVH_BUILDER = '1' }
@@ -206,6 +218,7 @@ if ($DumpTargets) { $settings.VICTORY_DUMP_TARGETS = '1' }
 # A floor under the estimate, shaded by the creases: the estimate follows the
 # hour and at night is nearly nothing; the floor fills the shadow.
 if ($AmbientFloor -gt 0) { $settings.VICTORY_AMBIENT_FLOOR = "$AmbientFloor" }
+if ($AmbientMost -gt 0) { $settings.VICTORY_AMBIENT_MOST = "$AmbientMost" }
 foreach ($k in $More.Keys) { $settings[$k] = $More[$k] }
 foreach ($kv in ($Set -split ';')) {
     if ($kv -and $kv.Contains('=')) {

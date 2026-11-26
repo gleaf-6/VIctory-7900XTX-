@@ -68,7 +68,7 @@ leaves FSR and frame generation off.
 | **frame generation** | `VICTORY_FRAMEGEN=1`, on by default when the SDK folder is given |
 | the two presentation planes composed | automatic (Series S presents two) |
 | buffers kept in the card's memory | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=1024` |
-| the indirect light stand-in | `VICTORY_AMBIENT=0.4` |
+| the indirect light stand-in | `VICTORY_AMBIENT=constant:0.4` (a level, shaded in creases) |
 | title memory used in place | `VICTORY_INPLACE=2` |
 | copy-back beside the frame | `VICTORY_RELAY=2` |
 
@@ -110,7 +110,9 @@ shown at about **twice** the rendered rate (≈6–8 rendered, ≈15 shown).
 | `-FidelityFxDir <dir>` | the SDK's `signedbin`: the host upscaler and frame generation |
 | `-FrameGen` / `-FrameGen:$false` | frame generation on / off |
 | `-Async` | submissions prepared by a thread of ours: the same frame, fewer streaming artefacts |
-| `-Ambient <0..1>` | the indirect light stand-in (0.4 by default; 0.2/0 darker, 0.8 fuller) |
+| `-Ambient <0..1>` | the indirect light stand-in, a constant level (0.4 by default; 0.2/0 darker, 0.8 fuller) |
+| `-AmbientSpec <spec>` | `0.4` for a share of the estimate instead (follows the hour and the lamps, but keeps the sky's blue indoors: white paper becomes lavender) |
+| `-AmbientMost <n>` | with the estimate, how many times it the title's own sky light may be kept at (4 by default; 1.5 cuts it) |
 | `-AmbientFloor <n>` | a floor under the light estimate (useful at night) |
 | `-CardBuffers 0` | stop keeping buffers in the card's memory (slower here; useful for testing) |
 | `-TextureBudgetMB <n>` | cap the texture memory: faster, at the cost of the picture's light (0 = whole picture) |
