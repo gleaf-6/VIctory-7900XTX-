@@ -67,7 +67,7 @@ leaves FSR and frame generation off.
 | the PC FidelityFX upscaler | `VICTORY_FIDELITYFX_DIR` (the SDK's `signedbin`) |
 | **frame generation** | `VICTORY_FRAMEGEN=1`, on by default when the SDK folder is given |
 | the two presentation planes composed | automatic (Series S presents two) |
-| buffers kept in the card's memory | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=1024` |
+| buffers kept in the card's memory | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=auto` (1 GiB on the 8 GB class, 2 GiB on 16 GB cards, a quarter of the budget up to 8 GiB above) |
 | the indirect light stand-in | `VICTORY_AMBIENT=constant:0.4` (a level, shaded in creases) |
 | title memory used in place | `VICTORY_INPLACE=2` |
 | copy-back beside the frame | `VICTORY_RELAY=2` |
@@ -115,6 +115,7 @@ shown at about **twice** the rendered rate (≈6–8 rendered, ≈15 shown).
 | `-AmbientMost <n>` | with the estimate, how many times it the title's own sky light may be kept at (4 by default; 1.5 cuts it) |
 | `-AmbientFloor <n>` | a floor under the light estimate (useful at night) |
 | `-CardBuffers 0` | stop keeping buffers in the card's memory (slower here; useful for testing) |
+| `-CardBuffersMB <n>` | cap those copies in MiB (0 = by the card: 1 GiB on 8 GB, 2 GiB on 16 GB) |
 | `-TextureBudgetMB <n>` | cap the texture memory: faster, at the cost of the picture's light (0 = whole picture) |
 | `-FillsMB <n>` | the byte coffer for textures the title fills (96 by default) |
 | `-Inplace 0/1/2`, `-Relay 0/2`, `-Thin 0/1` | the memory and submission strategies (leave as they are unless testing) |

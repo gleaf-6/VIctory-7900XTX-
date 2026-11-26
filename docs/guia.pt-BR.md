@@ -68,7 +68,7 @@ e frame generation desligados.
 | o upscaler FidelityFX de PC | `VICTORY_FIDELITYFX_DIR` (o `signedbin` do SDK) |
 | **frame generation** | `VICTORY_FRAMEGEN=1`, ligado por padrão quando a pasta do SDK é dada |
 | os dois planes de apresentação compostos | automático (o Series S apresenta dois) |
-| buffers mantidos na memória da placa | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=1024` |
+| buffers mantidos na memória da placa | `VICTORY_CARD_BUFFERS_MIN_KB=64`, `VICTORY_CARD_BUFFERS_MB=auto` (1 GiB na classe 8 GB, 2 GiB em placas de 16 GB, um quarto do orçamento até 8 GiB acima) |
 | o stand-in de luz indireta | `VICTORY_AMBIENT=constant:0.4` (um nível, sombreado nas dobras) |
 | memória do título usada no lugar | `VICTORY_INPLACE=2` |
 | copy-back ao lado do quadro | `VICTORY_RELAY=2` |
@@ -117,6 +117,7 @@ imagem aparece a cerca de **duas vezes** a taxa renderizada (≈6–8 renderizad
 | `-AmbientMost <n>` | com a estimativa, quantas vezes ela a luz de céu que o título deixou pode ficar (4 padrão; 1.5 corta) |
 | `-AmbientFloor <n>` | piso para a estimativa de luz (útil à noite) |
 | `-CardBuffers 0` | deixa de manter buffers na memória da placa (mais lento aqui; para teste) |
+| `-CardBuffersMB <n>` | limita essas cópias em MiB (0 = pela placa: 1 GiB em 8 GB, 2 GiB em 16 GB) |
 | `-TextureBudgetMB <n>` | limita a memória de textura: mais rápido, ao custo da luz da imagem (0 = imagem inteira) |
 | `-FillsMB <n>` | o cofre de bytes para texturas que o título preenche (96 padrão) |
 | `-Inplace 0/1/2`, `-Relay 0/2`, `-Thin 0/1` | as estratégias de memória e submissão (deixe como está, salvo em teste) |

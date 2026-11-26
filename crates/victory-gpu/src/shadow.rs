@@ -166,6 +166,29 @@ pub(crate) fn cards() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_CARD_BUFFERS").is_none_or(|v| v != "0"))
 }
 
+/// The most bytes of card copies when `VICTORY_CARD_BUFFERS_MB=auto` (what
+/// `scripts\play-rx7600.ps1` passes by default), from the budget in bytes:
+///
+/// - `<= 12 GiB` (the 8 GB class, whose WDDM budget is below 12 GiB): 1 GiB,
+///   the measured best here (512 MiB made the frame 177.8 ms, 256 MiB 246.8);
+/// - `> 12 GiB` and `< 20 GiB` (16 GB cards): 2 GiB;
+/// - `>= 20 GiB`: a quarter of the budget, at most 8 GiB.
+fn auto_card_max_mb(local_vram_budget: Option<u64>) -> u64 {
+    const TWELVE_GIB_MB: u64 = 12 * 1024;
+    const TWENTY_GIB_MB: u64 = 20 * 1024;
+    let Some(budget_bytes) = local_vram_budget else {
+        return 1024;
+    };
+    let budget_mb = budget_bytes >> 20;
+    if budget_mb <= TWELVE_GIB_MB {
+        1024
+    } else if budget_mb < TWENTY_GIB_MB {
+        2048
+    } else {
+        (budget_mb / 4).min(8192)
+    }
+}
+
 /// Default `(min_mb, max_mb)` for [`card_limits`] chosen from the adapter's
 /// local VRAM budget (`DXGI_QUERY_VIDEO_MEMORY_INFO.Budget`), in bytes.
 ///
@@ -219,11 +242,21 @@ fn card_limits() -> (u64, u64) {
     *LIMITS.get_or_init(|| {
         let env_mb = |name: &str| std::env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok());
         let vram_budget = crate::host::host().and_then(|h| h.video_memory()).map(|[budget, ..]| budget);
-        let (mut min_bytes, max_bytes) = resolve_card_limits(
-            vram_budget,
-            env_mb("VICTORY_CARD_BUFFERS_MIN_MB"),
-            env_mb("VICTORY_CARD_BUFFERS_MB"),
-        );
+        // `VICTORY_CARD_BUFFERS_MB=auto`: the card's own class decides. The
+        // 8 GB class keeps the 1 GiB measured here; a 16 GB card takes 2 GiB,
+        // and a bigger one a quarter of its budget (at most 8 GiB).
+        let auto = std::env::var("VICTORY_CARD_BUFFERS_MB").is_ok_and(|v| v.trim().eq_ignore_ascii_case("auto"));
+        let (mut min_bytes, max_bytes) = if auto {
+            let min_mb = env_mb("VICTORY_CARD_BUFFERS_MIN_MB").unwrap_or(16);
+            let max_bytes = auto_card_max_mb(vram_budget) << 20;
+            (min_mb << 20, max_bytes)
+        } else {
+            resolve_card_limits(
+                vram_budget,
+                env_mb("VICTORY_CARD_BUFFERS_MIN_MB"),
+                env_mb("VICTORY_CARD_BUFFERS_MB"),
+            )
+        };
         // `VICTORY_CARD_BUFFERS_MIN_KB` (after fxceless c36971b2) says the
         // least size in KiB, so that it can go under 1 MiB: 64 is every title
         // buffer. Copies under 1 MiB are nearly all there are and few bytes;

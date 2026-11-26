@@ -34,9 +34,10 @@
 #               VICTORY_FIDELITYFX_SDK is given)
 # -SeriesX      force the bigger console (the default without the SDK: it
 #               renders without the host upscaler)
-# -Tune         kept for old command lines: the card-side buffers it sets
-#               (VICTORY_CARD_BUFFERS_MIN_KB=64, VICTORY_CARD_BUFFERS_MB=1024,
-#               after fxceless/victory-fork) are the default now.
+# -Tune         kept for old command lines: it sets what is now the default of
+#               the 8 GB class, VICTORY_CARD_BUFFERS_MIN_KB=64 with 1 GiB of
+#               card copies (after fxceless/victory-fork); -CardBuffersMB
+#               overrides the size, and the default follows the card.
 #               VICTORY_INPLACE is NOT part of them: measured here, that one
 #               made frames 1.2-2.0 s (from 0.3-1.4) and ended the process
 #               after about 100 s - the title frees memory it has opened.
@@ -99,6 +100,10 @@ param(
     [ValidateSet(0, 2)][int]$Relay = 2,
     [ValidateSet(0, 1, 2)][int]$Inplace = 0,
     [ValidateSet(0, 1)][int]$CardBuffers = 1,
+    # The cap for card copies of title buffers, in MiB (VICTORY_CARD_BUFFERS_MB):
+    # 0 lets the card's own class decide (1 GiB on the 8 GB class, 2 GiB on
+    # 16 GB cards, a quarter of the budget up to 8 GiB above).
+    [ValidateRange(0, 8192)][int]$CardBuffersMB = 0,
     [int]$PipelineWaitMS = 24,
     [ValidateSet('diag', 'release')][string]$Build = 'diag',
     [hashtable]$More = @{}
@@ -193,12 +198,15 @@ if ($Inplace -gt 0) { $settings.VICTORY_INPLACE = "$Inplace" }
 # memory the copying is the card's, and the frame is 131.1 ms: 1 GiB of
 # them, copies from 64 KiB up. Measured beside it: 512 MiB 177.8 ms, 256 MiB
 # 246.8 (worse than none), 1536 MiB 144.7 (the card is nearly full at 6.5 of
-# 8 GB). -CardBuffers 0 turns it off.
+# 8 GB). -CardBuffers 0 turns it off; -CardBuffersMB forces a size.
 if ($CardBuffers -eq 0) {
     $settings.VICTORY_CARD_BUFFERS = '0'
 } else {
     $settings.VICTORY_CARD_BUFFERS_MIN_KB = '64'
-    $settings.VICTORY_CARD_BUFFERS_MB = '1024'
+    # auto, from the card's budget in DXGI: 1 GiB on the 8 GB class (measured
+    # here: 512 MiB 177.8 ms, 256 MiB 246.8), 2 GiB on 16 GB cards, a quarter
+    # of the budget (at most 8 GiB) above. -CardBuffersMB forces one instead.
+    $settings.VICTORY_CARD_BUFFERS_MB = $(if ($CardBuffersMB -gt 0) { "$CardBuffersMB" } else { 'auto' })
 }
 # Record one frame for `victory replay` (`docs/replay.md`): the stable benchmark.
 if ($Capture) {
@@ -251,7 +259,7 @@ Write-Host ("profile: {0} | FSR: {1} | frame generation: {2} | card buffers: {3}
     $(if ($seriesS) { 'Series S' } else { 'Series X' }), `
     $(if ($FidelityFxDir) { 'on' } else { 'OFF' }), `
     $(if ($fgOn) { 'on' } else { 'off' }), `
-    $(if ($CardBuffers -eq 0) { 'off' } else { '1 GiB' }), `
+    $(if ($CardBuffers -eq 0) { 'off' } elseif ($CardBuffersMB -gt 0) { "$CardBuffersMB MB" } else { 'auto' }), `
     $Relay, $Inplace, $settings.VICTORY_AMBIENT)
 if (-not $FidelityFxDir) {
     Write-Host 'warning: no FidelityFX folder. Series S has no upscaler to answer it and draws a black world,' -ForegroundColor Yellow

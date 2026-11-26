@@ -31,6 +31,8 @@ or publisher.
   (depth, motion vectors, jitter, camera, frame time);
 - buffers kept in the card's own memory: 219.6 to 131.1 ms a frame in the
   world, 6-8 real frames a second and about 15 shown with frame generation;
+  the cap follows the card (1 GiB on the 8 GB class, 2 GiB on 16 GB cards,
+  a quarter of the budget up to 8 GiB above);
 - page mappings as runs of pages, and the `codec-d/cool_fox` fork's six commits
   (deferred descriptor records, bindless refreshes scoped to their heap,
   textures sent ahead, residency and pool back-off);
