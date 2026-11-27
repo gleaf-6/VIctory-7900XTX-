@@ -277,8 +277,10 @@ are not part of this repository.
 - **The write guards' lock taken shared** (Belobug's renderer port 6,
   `VICTORY_PORT_GUARD=1`, off by default): the title's write faults and the
   refreshes' looks at view memory no longer wait for one another, a claim
-  per 64 KiB block does the ordering. The waits for that lock, all threads,
-  went from 36-40 to 2-6 ms a frame here.
+  per 64 KiB block does the ordering; the waits for that lock, all threads,
+  went from 36-78 to 2-6 ms a frame here. View memory's kernel askings,
+  which it refuses anyway, are left out (335 a frame here), and a
+  submission's refreshes are planned on the threads beside.
 - **Frame record and replay** with per-pass times and shader variants compared
   turn by turn ([docs/replay.md](docs/replay.md)).
 

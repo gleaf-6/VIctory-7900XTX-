@@ -156,7 +156,9 @@ pelas opções dele.
 - **Menos espera nos write guards**: acrescente `-Set "VICTORY_PORT_GUARD=1"`
   (os write faults do título e os guards dos refreshes pegam o lock dos guards
   compartilhado, com um claim por bloco de 64 KiB: as esperas por ele, em
-  todas as threads, de 36-40 para 2-6 ms por quadro aqui).
+  todas as threads, de 36-78 para 2-6 ms por quadro aqui; as perguntas ao
+  kernel para memória de view, que ele recusa, ficam de fora, e os refreshes
+  de uma submissão são planejados nas threads ao lado).
 - **Artefatos do frame generation**: `-FrameGen:$false`.
 
 ## Problemas conhecidos
