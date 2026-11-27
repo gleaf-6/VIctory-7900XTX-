@@ -153,6 +153,10 @@ pelas opções dele.
 - **Mais quadros, menos luz**: `-TextureBudgetMB 640` (luz parcial) ou menos.
 - **Interior estourado/escuro**: `-Ambient 0.2` ou `-Ambient 0`.
 - **Engasgo enquanto o mundo carrega**: acrescente `-Async`.
+- **Menos espera nos write guards**: acrescente `-Set "VICTORY_PORT_GUARD=1"`
+  (os write faults do título e os guards dos refreshes pegam o lock dos guards
+  compartilhado, com um claim por bloco de 64 KiB: as esperas por ele, em
+  todas as threads, de 36-40 para 2-6 ms por quadro aqui).
 - **Artefatos do frame generation**: `-FrameGen:$false`.
 
 ## Problemas conhecidos

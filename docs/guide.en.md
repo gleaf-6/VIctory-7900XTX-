@@ -148,6 +148,10 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
 - **More frames, less light**: `-TextureBudgetMB 640` (partial light) or lower.
 - **Darker/blown interiors**: `-Ambient 0.2` or `-Ambient 0`.
 - **Stutter while the world streams in**: add `-Async`.
+- **Less waiting on the write guards**: add `-Set "VICTORY_PORT_GUARD=1"`
+  (the title's write faults and the refreshes' guards take the guards' lock
+  shared, a claim per 64 KiB block: the waits for it, all threads, 36-40 to
+  2-6 ms a frame here).
 - **Artifacts from frame generation**: `-FrameGen:$false`.
 
 ## Known issues

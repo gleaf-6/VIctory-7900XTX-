@@ -274,6 +274,11 @@ are not part of this repository.
   heap's section opened as a host heap, its 174 MB buffer read and written by
   the card where the title has it, with no copy and no fill. Measured here in
   the open world: 150-157 to 94-104 ms a frame, the copies from 90-100 to 57 MB.
+- **The write guards' lock taken shared** (Belobug's renderer port 6,
+  `VICTORY_PORT_GUARD=1`, off by default): the title's write faults and the
+  refreshes' looks at view memory no longer wait for one another, a claim
+  per 64 KiB block does the ordering. The waits for that lock, all threads,
+  went from 36-40 to 2-6 ms a frame here.
 - **Frame record and replay** with per-pass times and shader variants compared
   turn by turn ([docs/replay.md](docs/replay.md)).
 
@@ -291,7 +296,8 @@ commits taken from elsewhere name the commit and its author.
   cube gradients, sparse textures.
 - **[Belobug/VIctory-Belobug-AMD](https://github.com/Belobug/VIctory-Belobug-AMD)**:
   the ambient light idea, pipeline workers, work by romainhedouin, and the
-  renderer ports (the title's 32-bit graphics heap read in place).
+  renderer ports (the title's 32-bit graphics heap read in place, and the
+  write guards' lock taken shared).
 - **[codec-d/cool_fox](https://github.com/codec-d/cool_fox)**: the performance
   work merged here (deferred descriptor records, bindless refreshes scoped to
   their heap, textures ahead, residency, pool back-off).
