@@ -1403,8 +1403,18 @@ pub(crate) fn log(frames: f64) {
         // SAFETY: a valid out pointer of the right size.
         unsafe { VirtualQuery(src as *const _, &mut info, size_of_val(&info)) };
         let kind = info.Type;
+        let view = match crate::inplace::cover(src, len) {
+            crate::inplace::Cover::Run(..) => "run",
+            crate::inplace::Cover::Holes => "holes",
+            crate::inplace::Cover::Scattered => "scattered",
+            crate::inplace::Cover::None => "none",
+        };
+        let stretch = crate::inplace::stretch(src, len).is_some();
+        let port = crate::port::wanted(src as u64, len as u64);
+        let committed = crate::texture::committed(src as *const u8, len);
         tracing::info!(
-            "  copied from {src:#x}+{len:#x} (memory {kind:#x}): {:.1}x/frame, {:.2} MB/frame, {:.2} ms/frame",
+            "  copied from {src:#x}+{len:#x} (memory {kind:#x}): {:.1}x/frame, {:.2} MB/frame, {:.2} ms/frame; view {view}, \
+             stretch {stretch}, port {port}, committed {committed}",
             n as f64 / frames,
             bytes as f64 / 1e6 / frames,
             us as f64 / 1e3 / frames
