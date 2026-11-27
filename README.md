@@ -280,7 +280,8 @@ are not part of this repository.
   per 64 KiB block does the ordering; the waits for that lock, all threads,
   went from 36-78 to 2-6 ms a frame here. View memory's kernel askings,
   which it refuses anyway, are left out (335 a frame here), and a
-  submission's refreshes are planned on the threads beside.
+  submission's refreshes are planned on the threads beside. Paired A/B in
+  one world (6 s phases, 33 transitions): about 2 ms a frame faster.
 - **Frame record and replay** with per-pass times and shader variants compared
   turn by turn ([docs/replay.md](docs/replay.md)).
 

@@ -152,7 +152,8 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
   (the title's write faults and the refreshes' guards take the guards' lock
   shared, a claim per 64 KiB block: the waits for it, all threads, 36-78 to
   2-6 ms a frame here; view memory's kernel askings are left out and a
-  submission's refreshes are planned on the threads beside).
+  submission's refreshes are planned on the threads beside). A paired A/B in
+  one world (6 s phases, 33 transitions) measured about 2 ms a frame faster.
 - **Artifacts from frame generation**: `-FrameGen:$false`.
 
 ## Known issues
