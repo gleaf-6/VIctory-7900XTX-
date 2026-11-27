@@ -676,6 +676,12 @@ pub(crate) fn writes(start: usize, end: usize, guarded: bool) -> Option<(u64, Ve
         let j = journal();
         return Some((next_asking(), of(&j)));
     }
+    // Renderer port #6: view memory, which the kernel would refuse, and the
+    // caller does not ask the guards (textures, which then guard by a way of
+    // their own): no kernel call, ~300 a frame (their run guard-2).
+    if !guarded && refused_as_view(start, end) {
+        return None;
+    }
     // Asked, and the answer noted, with the range held: nothing else asks
     // about any of it in between.
     let _range = Asking::hold(first, last);
@@ -683,8 +689,14 @@ pub(crate) fn writes(start: usize, end: usize, guarded: bool) -> Option<(u64, Ve
         return Some(known);
     }
     let mut guards_asked = false;
-    // (View memory read-only by our hand: the kernel would refuse.)
-    let refused = guarded && light() && PROTECTED.any(first, last);
+    // (View memory read-only by our hand: the kernel would refuse. With
+    // renderer port #6 also view memory known as such, [`VIEWS`].)
+    let protected = guarded && light() && PROTECTED.any(first, last);
+    let viewed = guarded && !protected && known_views(first, last);
+    if viewed {
+        port6_count(P6_NOT_ASKED, 1);
+    }
+    let refused = protected || viewed;
     let pages = match if refused { None } else { kernel_written(first, last) } {
         Some(pages) => pages,
         None => {
@@ -694,7 +706,17 @@ pub(crate) fn writes(start: usize, end: usize, guarded: bool) -> Option<(u64, Ve
             }
             #[cfg(feature = "diagnostics")]
             let guarding = std::time::Instant::now();
-            let written = guard(first * PAGE, last * PAGE).map(|pages| pages.into_iter().map(|p| (p, WHOLE)).collect::<Vec<_>>());
+            let mut written =
+                guard(first * PAGE, last * PAGE).map(|pages| pages.into_iter().map(|p| (p, WHOLE)).collect::<Vec<_>>());
+            if written.is_none() && viewed {
+                // Not a view after all (other memory there now): forgotten as
+                // one, and the kernel asked as before.
+                (first..last).for_each(|block| VIEWS.clear(block));
+                if let Some(pages) = kernel_written(first, last) {
+                    guards_asked = false;
+                    written = Some(pages);
+                }
+            }
             #[cfg(feature = "diagnostics")]
             {
                 use crate::copystat::{C, add};
@@ -1075,6 +1097,46 @@ static PROTECTED: Bits = Bits::new();
 /// or came before the title's thread went on from its write; and who takes
 /// the bit reads the bytes after.
 static BESIDE: Bits = Bits::new();
+
+/// The blocks known to be view memory (renderer port #6): guarded by us
+/// once, or found a view by [`guard`]. The kernel refuses to ask about them
+/// (its write watch is not kept for views), and with the switch such a
+/// range goes to the guards at once. Forgotten when the memory is unmapped
+/// or freed; a block wrongly here is only looked at by the guards, which
+/// find it no view ([`is_view`]) and say the range is not watched.
+static VIEWS: Bits = Bits::new();
+
+/// Whether a block of `[first, last)` is known view memory and the kernel
+/// need not be asked ([`VIEWS`]).
+fn known_views(first: usize, last: usize) -> bool {
+    port_guard_asked() && light() && VIEWS.any(first, last)
+}
+
+/// Whether title memory `[start, end)` is view memory the kernel refuses to
+/// watch (renderer port #6): guarded by our hand, or known as such. No
+/// kernel call for it: ~300 a frame were refused.
+fn refused_as_view(start: usize, end: usize) -> bool {
+    if !port_guard_asked() || !light() {
+        return false;
+    }
+    let (first, last) = (start / BLOCK, end.div_ceil(BLOCK));
+    let refused = PROTECTED.any(first, last) || VIEWS.any(first, last);
+    if refused {
+        port6_count(P6_NOT_ASKED, 1);
+    }
+    refused
+}
+
+/// What is known of `[first, last)` as view memory ([`VIEWS`]) is forgotten.
+fn forget_views(first: usize, last: usize) {
+    if !VIEWS.any(first, last) {
+        return;
+    }
+    let set: Vec<usize> = VIEWS.set_in(first, last).collect();
+    for block in set {
+        VIEWS.clear(block);
+    }
+}
 
 /// How much was put into a block beside its guard since it was last told as
 /// written (`crate::titlewrite::MOST`), by a few bits of its number.
@@ -1538,6 +1600,31 @@ pub(crate) fn port_guard() -> bool {
     }
 }
 
+/// With renderer port #6: whether a submission's look at which refreshes
+/// copy nothing (`Shadow::nothing_new`, before the threads are woken for the
+/// others) is made on the threads beside the submitting one, as it already
+/// was for more than 256 refreshes (`VICTORY_PORT_GUARD_PLAN=0`: on the
+/// submitting thread, as before; A/B-able by that name).
+pub(crate) fn port_guard_plan() -> bool {
+    if !port_guard() {
+        return false;
+    }
+    static ON: std::sync::OnceLock<Result<bool, u32>> = std::sync::OnceLock::new();
+    match *ON.get_or_init(|| {
+        #[cfg(feature = "diagnostics")]
+        if let Some(bit) = crate::ab::bit("VICTORY_PORT_GUARD_PLAN") {
+            return Err(bit);
+        }
+        Ok(std::env::var_os("VICTORY_PORT_GUARD_PLAN").is_none_or(|v| v != "0"))
+    }) {
+        Ok(on) => on,
+        #[cfg(feature = "diagnostics")]
+        Err(bit) => crate::ab::on(bit),
+        #[cfg(not(feature = "diagnostics"))]
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 thread_local! {
     /// [`port_guard`], for what this thread does.
@@ -1618,13 +1705,14 @@ impl Drop for Claims {
 /// Renderer port #6's counts since the last line: faults opened under the
 /// shared lock; nanoseconds they waited for the lock; refreshes' guards done
 /// shared; blocks a refresh could not claim (left written); spins for
-/// claims.
-static PORT6: [std::sync::atomic::AtomicU64; 5] = [const { std::sync::atomic::AtomicU64::new(0) }; 5];
+/// claims; kernel askings left out for view memory.
+static PORT6: [std::sync::atomic::AtomicU64; 6] = [const { std::sync::atomic::AtomicU64::new(0) }; 6];
 const P6_FAULTS: usize = 0;
 const P6_FAULT_WAIT_NS: usize = 1;
 const P6_GUARDS: usize = 2;
 const P6_CLAIMS_MISSED: usize = 3;
 const P6_CLAIM_SPINS: usize = 4;
+const P6_NOT_ASKED: usize = 5;
 
 fn port6_count(what: usize, n: u64) {
     PORT6[what].fetch_add(n, std::sync::atomic::Ordering::Relaxed);
@@ -1638,12 +1726,14 @@ pub(crate) fn port_guard_line(frames: f64) {
     }
     tracing::info!(
         "renderer port 6 (VICTORY_PORT_GUARD=1) per frame: faults opened under the shared lock {:.1} ({:.2} ms waiting for it), \
-         refreshes' guards done shared {:.1}, blocks left written for want of their claim {:.1}, spins for claims {:.0}",
+         refreshes' guards done shared {:.1}, blocks left written for want of their claim {:.1}, spins for claims {:.0}; \
+         kernel askings left out for view memory {:.1}",
         n[P6_FAULTS],
         n[P6_FAULT_WAIT_NS] / 1e6,
         n[P6_GUARDS],
         n[P6_CLAIMS_MISSED],
         n[P6_CLAIM_SPINS],
+        n[P6_NOT_ASKED],
     );
 }
 
@@ -2033,6 +2123,10 @@ fn guard(start: usize, end: usize) -> Option<Vec<usize>> {
     }
     let rest = rest();
     if port_guard_asked() {
+        // (Known for a view from now on.)
+        if !VIEWS.all(first, last) {
+            (first..last).for_each(|block| VIEWS.set(block));
+        }
         return Some(guard_shared(first, last, &came, rest));
     }
     let mut g = guards_timed();
@@ -2936,6 +3030,11 @@ pub fn title_memory_unmapping(at: usize, len: usize) {
 /// was noted of its blocks (guarded, clean, absent) would be taken for true
 /// of the next memory at the address.
 pub fn title_memory_freed(at: usize, len: usize) {
+    if len != 0 {
+        forget_views(at / BLOCK, at.saturating_add(len).div_ceil(BLOCK));
+    } else if VIEWS.any(at / BLOCK, at / BLOCK + 1) {
+        forget_views(at / BLOCK, allocation_end(at, at).div_ceil(BLOCK).max(at / BLOCK + 1));
+    }
     let mut g = guards();
     let first = at / BLOCK;
     let noted = [g.protected.range(first..).next(), g.absent.range(first..).next(), g.foreign.range(first..).next().copied()];
