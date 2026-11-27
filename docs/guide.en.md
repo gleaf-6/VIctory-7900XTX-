@@ -21,8 +21,8 @@ What that gives, measured on an RX 7600 8 GB / Ryzen 7 5700X:
 | | |
 |---|---|
 | menus, videos, loading screens | 30 fps |
-| the world | **9–10 frames a second** (94–104 ms a frame) |
-| frames shown, with frame generation | **~19 a second** |
+| the world | **7–10 frames a second** (94–140 ms a frame, by the spot; about 130 ms in the open world at 10–11k draws) |
+| frames shown, with frame generation | **~15–19 a second** |
 | picture | whole: lit world, interface, cutscenes (checked by saved frames) |
 
 **This is not a 30 fps experience on that hardware, and it does not claim to
@@ -103,12 +103,12 @@ colour, depth, motion vectors, jitter and camera.
 AMD's frame generation, through its own swap chain in place of the window's,
 fed by the title's upscale dispatch (depth, motion vectors, jitter, camera,
 frame time): one generated frame between two rendered ones, so the picture is
-shown at about **twice** the rendered rate (≈9–10 rendered, ≈19 shown).
+shown at about **twice** the rendered rate (≈7–10 rendered, ≈15–19 shown).
 
 - **On**: on by default with the SDK folder; `-FrameGen` forces it,
   `-FrameGen:$false` turns it off.
-- **Off** when: you dislike its artefacts. At 9–10 rendered frames a second two
-  frames are ~130 ms apart, so moving edges show ghosting; that is inherent to
+- **Off** when: you dislike its artefacts. At 7–10 rendered frames a second the
+  gap between shown frames is long, so moving edges show ghosting; that is inherent to
   interpolating so little information, not a bug.
 - It needs the upscaler's folder (the upscale is what feeds it).
 
@@ -174,7 +174,8 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
   declined on purpose; the title builds the same pipelines from its ordinary
   descriptions, so nothing is missing (upstream VIctory #3163).
 - The picture is verified by saved frames; the interface and the cutscenes are
-  expected to be whole in Series S, the menus are 30 fps, the world is 9-10.
+  expected to be whole in Series S, the menus are 30 fps, the world is 7-10
+  (by the spot).
 
 ## More
 
