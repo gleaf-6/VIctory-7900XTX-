@@ -158,8 +158,8 @@ pelas opções dele.
   compartilhado, com um claim por bloco de 64 KiB: as esperas por ele, em
   todas as threads, de 36-78 para 2-6 ms por quadro aqui; as perguntas ao
   kernel para memória de view, que ele recusa, ficam de fora, e os refreshes
-  de uma submissão são planejados nas threads ao lado; A/B pareado: ~2 ms por
-  quadro mais rápido).
+  de uma submissão são planejados nas threads ao lado; três A/B pareados no
+  mesmo mundo: ~1 ms por quadro mais rápido (0,2-2,3 ms entre runs).
 - **Artefatos do frame generation**: `-FrameGen:$false`.
 
 ## Problemas conhecidos
