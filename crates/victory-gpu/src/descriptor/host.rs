@@ -2804,6 +2804,18 @@ impl HostHeap {
         self.keep(index, kept.flatten());
     }
 
+    /// Remakes host slot `index` from `view`, the record it was made from
+    /// unchanged: binds the copy the view resolves to now, and retires the
+    /// resource the slot showed. For the pass over the heap's buffer views,
+    /// whose slot may show a copy that is no longer current (a buffer placed
+    /// anew in place when the title remapped its memory, a window shared
+    /// under another ask): what shaders read through the slot must be what
+    /// the pass brings up to date.
+    pub(crate) fn remake(&self, index: u32, view: &View) {
+        let _slot = self.made.lock(index);
+        self.make_at(index, view);
+    }
+
     /// Makes slot `index` (a dynamic one) the view the record `words` names,
     /// from this thread's descriptor of it if the recording `recording` has
     /// made one, else as [`HostHeap::make_at`] does, and keeps that
@@ -3356,12 +3368,19 @@ impl HostHeap {
     }
 
     /// Whether host slot `index` shows `buffer`; `None` if it shows no
-    /// resource (diagnostics: a buffer view's slot must show the host copy
-    /// that is brought up to date for it).
-    #[cfg(feature = "diagnostics")]
+    /// resource (a buffer view's slot must show the host copy that is
+    /// brought up to date for it).
     pub(crate) fn shows(&self, index: u32, buffer: &ID3D12Resource) -> Option<bool> {
-        let shown = self.kept_in(index)?;
-        Some(windows::core::Interface::as_raw(&shown) == windows::core::Interface::as_raw(buffer))
+        use windows::core::Interface;
+        let slot = self.kept.get(index as usize)?.lock().unwrap_or_else(|e| e.into_inner());
+        let shown = slot.as_ref()?;
+        Some(Interface::as_raw(shown) == Interface::as_raw(buffer))
+    }
+
+    /// The copy host slot `index` shows, if it shows one of ours
+    /// ([`crate::shadow::of_buffer`]).
+    pub(crate) fn shown_copy(&self, index: u32) -> Option<std::sync::Arc<crate::shadow::Shadow>> {
+        crate::shadow::of_buffer(&self.kept_in(index)?)
     }
 
     /// What the queue of textures picked by index knows of title slot

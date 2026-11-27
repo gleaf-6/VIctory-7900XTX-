@@ -2640,8 +2640,38 @@ mod merge_tests {
 /// snapshot still holds) and the bytes of title memory they copy.
 static LIVE: [std::sync::atomic::AtomicU64; 2] = [const { std::sync::atomic::AtomicU64::new(0) }; 2];
 
+/// The copy each host buffer is the copy of, by the buffer's resource: the
+/// slot that shows a buffer resolves the copy it shows here
+/// ([`of_buffer`]), so the pass brings up to date exactly that copy, even
+/// when the ask now names another (a window shared by `VICTORY_WINDOW_SHARE`,
+/// a buffer placed in place anew when the title remapped its memory).
+static BY_BUFFER: std::sync::LazyLock<std::sync::RwLock<std::collections::HashMap<usize, std::sync::Weak<Shadow>>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// `Arc::new` for a copy, remembered by its buffer ([`of_buffer`]).
+fn as_copy(shadow: Shadow) -> Arc<Shadow> {
+    let shadow = Arc::new(shadow);
+    let at = windows::core::Interface::as_raw(&shadow.buffer) as usize;
+    BY_BUFFER.write().unwrap_or_else(|e| e.into_inner()).insert(at, Arc::downgrade(&shadow));
+    shadow
+}
+
+/// The copy host buffer `buffer` belongs to, if it is one of ours a slot
+/// may show.
+pub(crate) fn of_buffer(buffer: &ID3D12Resource) -> Option<Arc<Shadow>> {
+    let at = windows::core::Interface::as_raw(buffer) as usize;
+    BY_BUFFER.read().unwrap_or_else(|e| e.into_inner()).get(&at)?.upgrade()
+}
+
 impl Drop for Shadow {
     fn drop(&mut self) {
+        {
+            let at = windows::core::Interface::as_raw(&self.buffer) as usize;
+            let mut map = BY_BUFFER.write().unwrap_or_else(|e| e.into_inner());
+            if map.get(&at).is_some_and(|weak| std::ptr::eq(weak.as_ptr(), self as *const Shadow)) {
+                map.remove(&at);
+            }
+        }
         if self.place.is_some() {
             // Never counted with the copies (`Shadow::placed`).
             crate::inplace::gone(self.window, self.len);
@@ -5162,11 +5192,11 @@ fn lookup(address: u64, len: u64, any: bool) -> Option<Arc<Shadow>> {
         // Renderer port 1 (`crate::port`, `VICTORY_PORT_CONSTANTS=1`): the
         // title's 32-bit graphics heap in place, big or not.
         if let Some(placed) = crate::port::place_for(key.0, len, false) {
-            entry.shadow = Some(Arc::new(Shadow::placed(placed, key.0, len, false)));
+            entry.shadow = Some(as_copy(Shadow::placed(placed, key.0, len, false)));
             return entry.shadow.clone();
         }
         if !big && let Some(placed) = crate::inplace::place_for(key.0, len, false) {
-            entry.shadow = Some(Arc::new(Shadow::placed(placed, key.0, len, false)));
+            entry.shadow = Some(as_copy(Shadow::placed(placed, key.0, len, false)));
             return entry.shadow.clone();
         }
         // One buffer in card memory the CPU maps (`VICTORY_BUFFER_BAR_MB`):
@@ -5183,7 +5213,7 @@ fn lookup(address: u64, len: u64, any: bool) -> Option<Arc<Shadow>> {
             let gpu = unsafe { buffer.GetGPUVirtualAddress() };
             let mut shadow = Shadow::new(buffer, data, gpu, key.0, len);
             shadow.mapped = true;
-            let shadow = Arc::new(shadow);
+            let shadow = as_copy(shadow);
             entry.shadow = Some(shadow.clone());
             return entry.shadow.clone();
         }
@@ -5228,7 +5258,7 @@ fn lookup(address: u64, len: u64, any: bool) -> Option<Arc<Shadow>> {
         }
         let mut shadow = Shadow::new(buffer, data, gpu, key.0, len);
         shadow.card = card;
-        let shadow = Arc::new(shadow);
+        let shadow = as_copy(shadow);
         if shadow.card.is_some() {
             CARDED.lock().unwrap_or_else(|e| e.into_inner()).push(Arc::downgrade(&shadow));
         }
@@ -5435,7 +5465,7 @@ pub(crate) fn by_address(start: u64, len: u64) -> Option<Arc<Shadow>> {
         touched: Default::default(),
         size: len,
     });
-    let shadow = Arc::new(shadow);
+    let shadow = as_copy(shadow);
     CARDED.lock().unwrap_or_else(|e| e.into_inner()).push(Arc::downgrade(&shadow));
     Some(shadow)
 }
@@ -5537,6 +5567,64 @@ fn committed_reach(from: u64, limit: u64) -> u64 {
 /// Copies of title memory outside buffers, by (start, length).
 static LOOSE: std::sync::RwLock<BTreeMap<(u64, u64), Arc<Shadow>>> = std::sync::RwLock::new(BTreeMap::new());
 
+/// Whether an ask with a length may take a copy that is there already and
+/// holds it, whatever its own ask was (`VICTORY_WINDOW_SHARE=1`; off by
+/// default): two asks over the same title memory then share one host copy
+/// instead of one each. The windows kept 5.5 GB for 3.0 GB of title memory
+/// (run place-survey); with it the difference falls.
+fn window_share() -> bool {
+    static ON: std::sync::OnceLock<Result<bool, u32>> = std::sync::OnceLock::new();
+    match *ON.get_or_init(|| {
+        #[cfg(feature = "diagnostics")]
+        if let Some(bit) = crate::ab::bit("VICTORY_WINDOW_SHARE") {
+            return Err(bit);
+        }
+        Ok(std::env::var("VICTORY_WINDOW_SHARE").is_ok_and(|v| v.trim() == "1"))
+    }) {
+        Ok(on) => on,
+        #[cfg(feature = "diagnostics")]
+        Err(bit) => crate::ab::on(bit),
+        #[cfg(not(feature = "diagnostics"))]
+        Err(_) => false,
+    }
+}
+
+/// The copy each ask's cells were first given, by the ask's canonical name
+/// (the cells [`window_of`] names). With [`window_share`] a copy made for
+/// one span of cells may hold asks of other spans, and a window is named
+/// by its ask alone: this remembers which copy a name got, so that every
+/// later ask for the same cells (the slot that shows it, the pass that
+/// brings it up to date, the draw that reads it) finds the same one.
+///
+/// Weak: a copy no list and no slot holds is let go as any other
+/// ([`let_go_idle`]), and its names are then given anew.
+static SHARED: std::sync::LazyLock<std::sync::RwLock<std::collections::HashMap<(u64, u64), std::sync::Weak<Shadow>>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// The copy name `name` was given, if it is there and holds `[address,
+/// end)`.
+fn shared_get(name: (u64, u64), address: u64, end: u64) -> Option<Arc<Shadow>> {
+    let shared = SHARED.read().unwrap_or_else(|e| e.into_inner());
+    let shadow = shared.get(&name)?.upgrade()?;
+    (shadow.start <= address && end <= shadow.start + shadow.len).then_some(shadow)
+}
+
+/// The copy name `name` keeps: the first one given (which `candidate` may
+/// not be, when two threads ask at once), or `candidate` and it is
+/// remembered. Decided under one lock, so that every ask for the name gets
+/// one copy.
+fn share_choose(name: (u64, u64), candidate: Arc<Shadow>, address: u64, end: u64) -> Arc<Shadow> {
+    let mut shared = SHARED.write().unwrap_or_else(|e| e.into_inner());
+    if let Some(first) = shared.get(&name).and_then(std::sync::Weak::upgrade)
+        && first.start <= address
+        && end <= first.start + first.len
+    {
+        return first;
+    }
+    shared.insert(name, Arc::downgrade(&candidate));
+    candidate
+}
+
 fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Shadow>> {
     let (cell, _) = window_of(address, end, WINDOW);
     let named = if unsized_ask && !tails() {
@@ -5561,6 +5649,22 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
             shadow.unsized_asks.fetch_add(1, Ordering::Relaxed);
         }
     };
+    // With share: the copy this ask's cells were first given (kept even
+    // when share is turned off again: a slot made then shows it).
+    if !unsized_ask
+        && let Some(shadow) = shared_get(named, address, end)
+    {
+        note(&shadow);
+        return Some(shadow);
+    }
+    // The copy `hand` gives back, noted: what share says the ask's name
+    // keeps (the first it was given, which may be another thread's), or
+    // the ask's own.
+    let hand = |shadow: Arc<Shadow>| {
+        let shadow = if window_share() && !unsized_ask { share_choose(named, shadow, address, end) } else { shadow };
+        note(&shadow);
+        shadow
+    };
     // The window is there already (nearly always): readers share the lock.
     // Also when windows are finer than their cell (`fine`) and the ask takes
     // any that holds it: that search was made under the write lock only, so
@@ -5572,41 +5676,43 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
         let key = if unsized_ask && tails() {
             let there = map.range((cell, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
             longest_tail(there, address, end)
-        } else if any && fine() && !unsized_ask {
-            let there = map.range((cell, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
+        } else if (any && fine() && !unsized_ask) || (window_share() && !unsized_ask) {
+            // With share a copy made for other cells may hold this ask: the
+            // look goes back a root window's length.
+            let from = if window_share() && !unsized_ask { address.saturating_sub(root_window_most()) } else { cell };
+            let there = map.range((from, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
             Some(holder(there, address, end).unwrap_or(named))
         } else {
             Some(named)
         };
         if let Some(shadow) = key.and_then(|key| map.get(&key)) {
-            note(shadow);
-            return Some(shadow.clone());
+            return Some(hand(shadow.clone()));
         }
     }
     let mut map = LOOSE.write().unwrap_or_else(|e| e.into_inner());
     let (start, len) = if unsized_ask && tails() {
         let there = map.range((cell, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
         longest_tail(there, address, end).unwrap_or_else(|| tail_of(address, end))
-    } else if any && fine() && !unsized_ask {
+    } else if (any && fine() && !unsized_ask) || (window_share() && !unsized_ask) {
         // The windows that begin in the ask's cell at or below the ask (one
         // that begins in a cell below and reaches this far is passed over:
-        // the ask then makes its own).
-        let there = map.range((cell, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
+        // the ask then makes its own). With share the look goes back a root
+        // window's length, over the cells below.
+        let from = if window_share() && !unsized_ask { address.saturating_sub(root_window_most()) } else { cell };
+        let there = map.range((from, 0)..=(address, u64::MAX)).map(|(key, _)| *key);
         holder(there, address, end).unwrap_or(named)
     } else {
         named
     };
     if let Some(shadow) = map.get(&(start, len)) {
-        note(shadow);
-        return Some(shadow.clone());
+        return Some(hand(shadow.clone()));
     }
     // In place, if asked for and the window's memory can be opened: the
     // window is the title's own memory, with nothing to copy.
     if let Some(placed) = crate::port::place_for(start, len, true).or_else(|| crate::inplace::place_for(start, len, true)) {
-        let shadow = Arc::new(Shadow::placed(placed, start, len, true));
-        note(&shadow);
+        let shadow = as_copy(Shadow::placed(placed, start, len, true));
         map.insert((start, len), shadow.clone());
-        return Some(shadow);
+        return Some(hand(shadow));
     }
     // One buffer in the card's memory, filled by the CPU through the bus.
     if let Some((buffer, data)) = window_mapped_for(len) {
@@ -5616,10 +5722,9 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
         let mut shadow = Shadow::new(buffer, data, gpu, start, len);
         shadow.window = true;
         shadow.mapped = true;
-        let shadow = Arc::new(shadow);
-        note(&shadow);
+        let shadow = as_copy(shadow);
         map.insert((start, len), shadow.clone());
-        return Some(shadow);
+        return Some(hand(shadow));
     }
     let (buffer, data) = host()?.shared_buffer(len)?;
     crate::host::name(&buffer, || format!("title memory {start:#x}+{len:#x}"));
@@ -5650,13 +5755,12 @@ fn loose(address: u64, end: u64, unsized_ask: bool, any: bool) -> Option<Arc<Sha
     let mut shadow = Shadow::new(buffer, data, gpu, start, len);
     shadow.window = true;
     shadow.card = card;
-    let shadow = Arc::new(shadow);
+    let shadow = as_copy(shadow);
     if shadow.card.is_some() {
         CARDED.lock().unwrap_or_else(|e| e.into_inner()).push(Arc::downgrade(&shadow));
     }
-    note(&shadow);
     map.insert((start, len), shadow.clone());
-    Some(shadow)
+    Some(hand(shadow))
 }
 
 /// Copies of single buffer views' own bytes ([`exact`]), by (start,

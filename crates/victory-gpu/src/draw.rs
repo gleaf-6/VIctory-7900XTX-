@@ -982,10 +982,34 @@ fn heap_buffer_pass(heap: &crate::descriptor::Heap, host: &crate::descriptor::ho
         let view = host.mirror(index, heap.handle(index)?, true)?;
         // The copy the slot shows (`buffer_copy`), not the one the
         // view's range alone would find.
-        let (shadow, address, len) = crate::descriptor::host::buffer_copy(&view)?;
-        #[cfg(feature = "diagnostics")]
+        let (mut shadow, address, len) = crate::descriptor::host::buffer_copy(&view)?;
         if host.shows(index, &shadow.buffer) == Some(false) {
-            HEAP_VIEWS_ELSEWHERE.fetch_add(1, Ordering::Relaxed);
+            // The slot shows an older copy (a buffer placed anew in place
+            // when the title remapped its memory, a window another ask was
+            // given): bind the copy the view resolves to now, and bring up
+            // to date what the slot shows.
+            host.remake(index, &view);
+            if let Some(shown) = host.shown_copy(index) {
+                let (start, bytes) = shown.span();
+                if start <= address && address.checked_add(len).is_some_and(|end| end <= start + bytes) {
+                    shadow = shown;
+                }
+            }
+            #[cfg(feature = "diagnostics")]
+            {
+                let seen = HEAP_VIEWS_ELSEWHERE.fetch_add(1, Ordering::Relaxed);
+                if seen < 16 {
+                    let text = format!("{view:?}");
+                    let text: String = text.chars().take(200).collect();
+                    let (start, bytes) = shadow.span();
+                    tracing::info!(
+                        index,
+                        view = text.as_str(),
+                        copy = format_args!("{start:#x}+{bytes:#x}"),
+                        "a heap buffer view's slot showed an older copy than the one brought up to date; remade"
+                    );
+                }
+            }
         }
         let written = crate::picked::on() && view_kind(&view) == Some(ResourceType::Uav);
         Some(((shadow, address, address + len), written))
