@@ -8857,6 +8857,7 @@ impl Meter {
         #[cfg(feature = "diagnostics")]
         crate::draw::pipeline_line(frames);
         crate::descriptor::sync_line(frames);
+    crate::watch::port_guard_line(frames);
         late_line(frames);
         crate::queue::behind_line(frames);
         card_clock_line(frames, ms);
