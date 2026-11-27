@@ -143,6 +143,13 @@ $settings = @{
     # (it refuses by itself, falling back to copies, on a build whose heap is
     # not one stretch of one section).
     VICTORY_PORT_CONSTANTS = '1'
+    # Renderer port 6 (Belobug's, `VICTORY_PORT_GUARD`): the write guards' one
+    # lock is taken shared by the title's write faults and the refreshes'
+    # guards, a claim per 64 KiB block for the ordering, so they no longer
+    # wait for one another. The waits for it, all threads, fell from 36-78 to
+    # 2-6 ms a frame here (about 1 ms of frame in paired A/B runs).
+    # `-Set VICTORY_PORT_GUARD=0` turns it off.
+    VICTORY_PORT_GUARD = '1'
     # Windows of title memory on a 256 KiB grid: every window is the PC's
     # memory in full, however little of it is read (`shadow.rs`, `window`).
     VICTORY_WINDOW_KB = "$WindowKB"

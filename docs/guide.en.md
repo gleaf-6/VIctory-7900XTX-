@@ -72,6 +72,7 @@ leaves FSR and frame generation off.
 | title memory used in place | `VICTORY_INPLACE=2` |
 | copy-back beside the frame | `VICTORY_RELAY=2` |
 | the 32-bit graphics heap in place | `VICTORY_PORT_CONSTANTS=1`: the card reads and writes the title's 174 MB buffer where it has it, no copy (150-157 to 94-104 ms a frame in the open world) |
+| the write guards' lock shared | `VICTORY_PORT_GUARD=1`: the title's write faults and the refreshes' guards no longer wait for one another, a claim per 64 KiB block does the ordering; the waits for it, all threads, 36-78 to 2-6 ms a frame here (about 1 ms of frame) |
 
 The picture fixes ported from RYUKI-7900XT and Scarlett (through
 [avatarmanz/VIctory-7900XTX #329](https://github.com/avatarmanz/VIctory-7900XTX/pull/329))
@@ -148,13 +149,13 @@ clears them for the run unless passed with `-Set`, `-More` or its own options.
 - **More frames, less light**: `-TextureBudgetMB 640` (partial light) or lower.
 - **Darker/blown interiors**: `-Ambient 0.2` or `-Ambient 0`.
 - **Stutter while the world streams in**: add `-Async`.
-- **Less waiting on the write guards**: add `-Set "VICTORY_PORT_GUARD=1"`
-  (the title's write faults and the refreshes' guards take the guards' lock
-  shared, a claim per 64 KiB block: the waits for it, all threads, 36-78 to
-  2-6 ms a frame here; view memory's kernel askings are left out and a
-  submission's refreshes are planned on the threads beside). Three paired
-  A/B runs in one world (6 s phases) measured about 1 ms a frame faster
-  (0.2-2.3 ms across runs).
+- **Less waiting on the write guards**: on by default
+  (`-Set VICTORY_PORT_GUARD=0` turns it off; the title's write faults and the
+  refreshes' guards take the guards' lock shared, a claim per 64 KiB block:
+  the waits for it, all threads, 36-78 to 2-6 ms a frame here; view memory's
+  kernel askings are left out and a submission's refreshes are planned on the
+  threads beside). Three paired A/B runs in one world (6 s phases) measured
+  about 1 ms a frame faster (0.2-2.3 ms across runs).
 - **Artifacts from frame generation**: `-FrameGen:$false`.
 
 ## Known issues

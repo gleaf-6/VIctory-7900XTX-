@@ -275,7 +275,7 @@ are not part of this repository.
   the card where the title has it, with no copy and no fill. Measured here in
   the open world: 150-157 to 94-104 ms a frame, the copies from 90-100 to 57 MB.
 - **The write guards' lock taken shared** (Belobug's renderer port 6,
-  `VICTORY_PORT_GUARD=1`, off by default): the title's write faults and the
+  `VICTORY_PORT_GUARD`, on by default here): the title's write faults and the
   refreshes' looks at view memory no longer wait for one another, a claim
   per 64 KiB block does the ordering; the waits for that lock, all threads,
   went from 36-78 to 2-6 ms a frame here. View memory's kernel askings,

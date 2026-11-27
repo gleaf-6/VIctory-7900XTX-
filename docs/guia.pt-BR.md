@@ -153,13 +153,14 @@ pelas opções dele.
 - **Mais quadros, menos luz**: `-TextureBudgetMB 640` (luz parcial) ou menos.
 - **Interior estourado/escuro**: `-Ambient 0.2` ou `-Ambient 0`.
 - **Engasgo enquanto o mundo carrega**: acrescente `-Async`.
-- **Menos espera nos write guards**: acrescente `-Set "VICTORY_PORT_GUARD=1"`
-  (os write faults do título e os guards dos refreshes pegam o lock dos guards
-  compartilhado, com um claim por bloco de 64 KiB: as esperas por ele, em
-  todas as threads, de 36-78 para 2-6 ms por quadro aqui; as perguntas ao
-  kernel para memória de view, que ele recusa, ficam de fora, e os refreshes
-  de uma submissão são planejados nas threads ao lado; três A/B pareados no
-  mesmo mundo: ~1 ms por quadro mais rápido (0,2-2,3 ms entre runs).
+- **Menos espera nos write guards**: vem ligado
+  (`VICTORY_PORT_GUARD=1`); `-Set VICTORY_PORT_GUARD=0` desliga. O lock dos
+  guards é compartilhado entre write faults e guards dos refreshes, com um
+  claim por bloco de 64 KiB: as esperas por ele, em todas as threads, de
+  36-78 para 2-6 ms por quadro aqui; as perguntas ao kernel para memória de
+  view, que ele recusa, ficam de fora, e os refreshes de uma submissão são
+  planejados nas threads ao lado; três A/B pareados no mesmo mundo: ~1 ms por
+  quadro mais rápido (0,2-2,3 ms entre runs).
 - **Artefatos do frame generation**: `-FrameGen:$false`.
 
 ## Problemas conhecidos
